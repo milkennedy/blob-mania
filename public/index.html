@@ -149,6 +149,8 @@
   .stick{position:absolute;width:110px;height:110px;border-radius:50%;border:2px solid rgba(233,244,236,.2)}
   .stick i{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;
     background:rgba(233,244,236,.25)}
+  .stick.aim{border-color:rgba(245,182,13,.55)}
+  .stick.aim i{background:rgba(245,182,13,.38)}
   @media (max-width:820px){ .menugrid{grid-template-columns:1fr} #hpBox{width:200px} #supBox{width:170px} }
   @media (prefers-reduced-motion:reduce){.toast{animation:none}}
 </style>
@@ -319,7 +321,7 @@ const SKINS = {
 const RARCOL={Common:"#7C9789",Rare:"#4EA8DE",Epic:"#A855F7",Legendary:"#F5B60D",Mythic:"#FFE9A3"};
 const MODES=[
   {id:"arena", ic:"🟢", n:"Last Blob Standing", d:"Seven blobs, no respawns, dig sites live."},
-  {id:"hoops", ic:"🏀", n:"Blob Hoops", d:"The hoop slides along the back line. First to 15."}
+  {id:"hoops", ic:"🏀", n:"Blob Hoops", d:"Grab the ball, shoot the sliding hoop. First to 6 wins."}
 ];
 
 /* ---- save ---- */
@@ -712,23 +714,39 @@ renderer.domElement.addEventListener("mousemove",e=>{mouse.x=e.clientX;mouse.y=e
 renderer.domElement.addEventListener("mousedown",e=>{e.preventDefault();mouse.down=true;});
 addEventListener("mouseup",()=>{mouse.down=false;});
 renderer.domElement.addEventListener("contextmenu",e=>e.preventDefault());
-/* touch: left half drags to move, right half aims and fires */
-let stick=null;
+/* touch: left half is a move stick, right half is an AIM stick —
+   drag to aim (the line shows where), let go to shoot. A quick tap shoots
+   straight away in the direction you are already facing. */
+let stick=null, aimStick=null;
 const touchLayer=document.getElementById("touch");
 renderer.domElement.addEventListener("touchstart",e=>{e.preventDefault();
   for(const t of e.changedTouches){
     if(t.clientX<innerWidth/2&&!stick){ stick={id:t.identifier,ox:t.clientX,oy:t.clientY,x:t.clientX,y:t.clientY};
-      touchLayer.innerHTML='<div class="stick" style="left:'+(t.clientX-55)+'px;top:'+(t.clientY-55)+'px"><i></i></div>';
-      touchLayer.classList.remove("hidden");
-    } else { mouse.x=t.clientX; mouse.y=t.clientY; mouse.down=true; } }},{passive:false});
+      drawSticks();
+    } else if(!aimStick){ aimStick={id:t.identifier,ox:t.clientX,oy:t.clientY,x:t.clientX,y:t.clientY};
+      drawSticks(); } }},{passive:false});
 renderer.domElement.addEventListener("touchmove",e=>{e.preventDefault();
-  for(const t of e.changedTouches){ if(stick&&t.identifier===stick.id){stick.x=t.clientX;stick.y=t.clientY;
-      const n=touchLayer.querySelector("i"); if(n){const dx=clamp(t.clientX-stick.ox,-34,34),dy=clamp(t.clientY-stick.oy,-34,34);
-        n.style.transform=`translate(${dx}px,${dy}px)`;} }
-    else {mouse.x=t.clientX;mouse.y=t.clientY;} }},{passive:false});
+  for(const t of e.changedTouches){
+    if(stick&&t.identifier===stick.id){ stick.x=t.clientX; stick.y=t.clientY; }
+    else if(aimStick&&t.identifier===aimStick.id){ aimStick.x=t.clientX; aimStick.y=t.clientY; }
+  }
+  drawSticks(); },{passive:false});
 renderer.domElement.addEventListener("touchend",e=>{
-  for(const t of e.changedTouches){ if(stick&&t.identifier===stick.id){stick=null;touchLayer.classList.add("hidden");}
-    else mouse.down=false; }});
+  for(const t of e.changedTouches){
+    if(stick&&t.identifier===stick.id) stick=null;
+    else if(aimStick&&t.identifier===aimStick.id){ aimStick=null; fire(); }   // let go to shoot
+  }
+  drawSticks();
+});
+function drawSticks(){
+  let html="";
+  if(stick) html+='<div class="stick" style="left:'+(stick.ox-55)+'px;top:'+(stick.oy-55)+'px"><i style="transform:translate('
+    +clamp(stick.x-stick.ox,-34,34)+'px,'+clamp(stick.y-stick.oy,-34,34)+'px)"></i></div>';
+  if(aimStick) html+='<div class="stick aim" style="left:'+(aimStick.ox-55)+'px;top:'+(aimStick.oy-55)+'px"><i style="transform:translate('
+    +clamp(aimStick.x-aimStick.ox,-34,34)+'px,'+clamp(aimStick.y-aimStick.oy,-34,34)+'px)"></i></div>';
+  touchLayer.innerHTML=html;
+  touchLayer.classList.toggle("hidden",!html);
+}
 
 /* ---- touch device: on-screen buttons instead of a keyboard ---- */
 const TOUCH = matchMedia("(pointer:coarse)").matches || navigator.maxTouchPoints>0;
@@ -798,7 +816,7 @@ function buildArena(){
   P.pos.set(0,1,30); P.hp=P.max=B().hp; P.ammo=3; P.at=0; P.at2=0; P.sup=0; P.dash=0; P.alive=true;
   if(P.blob)world.remove(P.blob.group);
   P.blob=makeBlob(B().color,SK().v,1.15); world.add(P.blob.group);
-  addPlayerRing();
+  addPlayerRing(); addAimLine();
   // bots
   const pal=["#A855F7","#3B82F6","#FACC15","#4ADE3C","#F97316","#EF4444"].filter(c=>c!==B().color);
   const vars=["classic","classic","emerald","gold","amethyst","sapphire"];
@@ -808,7 +826,21 @@ function buildArena(){
   }
   G.kills=0; G.gold0=save.gold;
 }
-let playerRing=null;
+let playerRing=null, aimLine=null;
+function addAimLine(){
+  aimLine=new THREE.Mesh(new THREE.PlaneGeometry(.5,1),
+    new THREE.MeshBasicMaterial({color:C(B().color),transparent:true,opacity:.26,
+      side:THREE.DoubleSide,depthWrite:false}));
+  aimLine.rotation.x=-Math.PI/2; world.add(aimLine);
+}
+function updateAimLine(){
+  if(!aimLine)return;
+  const len=(G.mode==="hoops"&&H.held)?15:B().range*.62;
+  aimLine.scale.set(1,len,1);
+  aimLine.position.set(P.pos.x+P.aim.x*len/2,.10,P.pos.z+P.aim.z*len/2);
+  aimLine.rotation.z=-Math.atan2(P.aim.x,P.aim.z);
+  aimLine.material.opacity=P.alive?(aimStick?.55:.24):0;
+}
 function addPlayerRing(){
   playerRing=new THREE.Mesh(new THREE.RingGeometry(1.5,1.78,32),
     new THREE.MeshBasicMaterial({color:C(B().color),transparent:true,opacity:.75,side:THREE.DoubleSide,
@@ -824,7 +856,8 @@ function addBot(pos,color,variant){
 /* ---- combat: damage never sees a skin ---- */
 function damageBot(bot,dmg){
   if(!bot.alive)return;
-  bot.hp-=dmg; P.sup=Math.min(100,P.sup+dmg*.16);
+  bot.hp-=dmg;
+  if(G.mode==="hoops"&&H.held&&H.heldBy===bot&&Math.random()<.5) dropBall();  // knock it loose P.sup=Math.min(100,P.sup+dmg*.16);
   bot.blob.setHit(true); setTimeout(()=>bot.blob&&bot.blob.setHit(false),70);
   if(bot.hp<=0){
     bot.alive=false; world.remove(bot.blob.group);
@@ -837,7 +870,10 @@ function hurtPlayer(dmg){
   if(!P.alive)return;
   P.hp-=dmg; shake=.22;
   if(P.hp<=0){ P.hp=0; P.alive=false; world.remove(P.blob.group);
-    burst(P.pos,30,11,B().color,1,2); splat(P.pos,B().color); endMatch(false); }
+    burst(P.pos,30,11,B().color,1,2); splat(P.pos,B().color);
+    if(G.mode==="hoops"){ if(H.held&&H.heldBy==="p")dropBall();
+      H.respawn=3; toast("Splatted — back in 3s","#F87171"); }
+    else endMatch(false); }
 }
 const splats=[];
 function splat(pos,color){
@@ -848,7 +884,11 @@ function splat(pos,color){
 }
 function fire(){
   const b=B();
-  if(P.ammo<1||P.at>0||!P.alive||!G.running)return;
+  if(!P.alive||!G.running)return;
+  if(G.mode==="hoops"&&H.held&&H.heldBy==="p"){       // holding the ball: shoot it
+    throwBall(P.pos,P.aim,aimedHoopDist(P.pos,P.aim)); return;
+  }
+  if(P.ammo<1||P.at>0)return;
   P.ammo--; P.at=b.rof;
   const fx=SK().fx, origin=P.pos.clone().add(P.aim.clone().multiplyScalar(1.3)).setY(1.1);
   for(let i=0;i<b.pellets;i++){
@@ -945,7 +985,10 @@ function updatePlayer(dt){
   if(stick){ const dx=stick.x-stick.ox, dz=stick.y-stick.oy, l=Math.hypot(dx,dz);
     if(l>10){ mx=dx/l; mz=dz/l; } }
   const l=Math.hypot(mx,mz); if(l>1){mx/=l;mz/=l;}
-  aimFromMouse();
+  if(aimStick){ const ax=aimStick.x-aimStick.ox, az=aimStick.y-aimStick.oy, al=Math.hypot(ax,az);
+    if(al>6) P.aim.set(ax/al,0,az/al); }
+  else if(!TOUCH) aimFromMouse();
+  updateAimLine();
   if(P.dashT>0){ P.dashT-=dt; }
   else { P.vel.x=lerp(P.vel.x,mx*b.speed,1-Math.pow(.0009,dt));
          P.vel.z=lerp(P.vel.z,mz*b.speed,1-Math.pow(.0009,dt)); }
@@ -966,16 +1009,48 @@ function updatePlayer(dt){
   if(P.at>0)P.at-=dt;
   if(P.ammo<3){ P.at2+=dt; if(P.at2>=b.reload){P.ammo++;P.at2=0;} }
   if(P.dash>0)P.dash=Math.max(0,P.dash-dt);
-  if(mouse.down)fire();
+  if(mouse.down&&!TOUCH)fire();
+}
+function hoopsAI(bt,dt){
+  const theirs=H.hoops[1];                       // rivals score in the +26 hoop
+  if(H.held&&H.heldBy===bt){                     // carrying: drive at the hoop, then shoot
+    const to=new THREE.Vector3(theirs.g.position.x-bt.pos.x,0,theirs.g.position.z-bt.pos.z);
+    const d=to.length(); bt.aim.copy(to).normalize();
+    if(d>13){ bt.vel.x=bt.aim.x*7; bt.vel.z=bt.aim.z*7; }
+    else {
+      bt.vel.multiplyScalar(.85);
+      bt.shootT=(bt.shootT||0)+dt;
+      if(bt.shootT>.8){ bt.shootT=0;
+        const err=(Math.random()-.5)*.16;         // rivals miss sometimes, like anyone
+        const aim=bt.aim.clone().applyAxisAngle(new THREE.Vector3(0,1,0),err);
+        throwBall(bt.pos,aim,d);
+      }
+    }
+    return true;
+  }
+  if(!H.held&&H.cool<=0){                        // loose ball: the closest rival goes for it
+    const bp=H.ball.position;
+    const dOf=o=>Math.hypot(bp.x-o.pos.x,bp.z-o.pos.z);
+    const nearest=bots.filter(o=>o.alive).sort((a,b2)=>dOf(a)-dOf(b2))[0];
+    if(nearest===bt){
+      const to=new THREE.Vector3(bp.x-bt.pos.x,0,bp.z-bt.pos.z);
+      bt.aim.copy(to).normalize(); bt.vel.x=bt.aim.x*7.4; bt.vel.z=bt.aim.z*7.4;
+      if(dOf(bt)<2.3&&bp.y<3.2){ H.held=true; H.heldBy=bt; bt.carry=true; }
+      return true;
+    }
+  }
+  return false;                                   // otherwise go bother the player
 }
 function updateBots(dt){
   bots.forEach(bt=>{
     if(!bt.alive)return;
+    const busy = (G.mode==="hoops") && hoopsAI(bt,dt);
     if(bt.burn>0){ bt.burn-=dt; bt.bt=(bt.bt||0)+dt; if(bt.bt>.5){bt.bt=0;damageBot(bt,22);} 
       if(Math.random()<.4)spark(bt.pos.x,1.4,bt.pos.z,0,2,0,.4,"#FB923C",1.2); }
     const to=P.pos.clone().sub(bt.pos).setY(0); const d=to.length();
-    const sees=P.alive&&!P.hidden&&d<34;
-    if(sees){
+    const sees=!busy&&P.alive&&!P.hidden&&d<34;
+    if(busy){ /* the ball is the job right now */ }
+    else if(sees){
       bt.aim.copy(to).normalize();
       const want=d>13?1:(d<8?-1:0);
       bt.vel.x=lerp(bt.vel.x,bt.aim.x*6.4*want,.08);
@@ -1136,32 +1211,38 @@ function drawMini(){
 /* =========================================================================
    BLOB HOOPS — the hoop rides a rail across the back line and slides
    ========================================================================= */
-const H={ball:null,vel:new THREE.Vector3(),hoop:null,rail:0,dir:1,speed:5,base:5,
-  score:0,time:120,pause:0,lastShotFrom:null,net:null};
+const H={ball:null,vel:new THREE.Vector3(),hoops:[],speed:5,base:5,
+  score:0,rival:0,time:180,lastShotFrom:null,lastThrower:null,
+  held:false,heldBy:null,cool:0,respawn:0};
+const WIN_SCORE=6;
 function buildHoops(){
   clearWorld(); crates=[]; bushes=[]; mounds=[]; bots=[]; walls3.length=0;
   addGround(76,"#12231A"); addWalls(66,3.0,0x1B3629);
-  // three-point arc painted on the floor
-  const arc=new THREE.Mesh(new THREE.RingGeometry(19.4,19.9,48,1,Math.PI*.5,Math.PI),
-    new THREE.MeshBasicMaterial({color:C(0xF5B60D),transparent:true,opacity:.35,side:THREE.DoubleSide}));
-  arc.rotation.x=-Math.PI/2; arc.position.set(-26,.06,0); arc.userData.own=1; world.add(arc);
-  // the rail across the back line
-  const rail=new THREE.Mesh(new THREE.BoxGeometry(.4,.4,30),
-    new THREE.MeshStandardMaterial({color:C(0x8FA79A),metalness:.9,roughness:.3,envMapIntensity:2}));
-  rail.position.set(-28,7.4,0); rail.userData.own=1; world.add(rail);
-  // the hoop itself
-  const hoop=new THREE.Group();
-  const ring=new THREE.Mesh(new THREE.TorusGeometry(1.9,.16,12,30),
-    new THREE.MeshStandardMaterial({color:C(0xF5B60D),metalness:1,roughness:.22,emissive:C(0x6b4d00),envMapIntensity:2.6}));
-  ring.rotation.x=Math.PI/2; hoop.add(ring);
-  const board=new THREE.Mesh(new THREE.BoxGeometry(.3,3.4,4.6),
-    new THREE.MeshStandardMaterial({color:C(0xE9F4EC),transparent:true,opacity:.28,roughness:.1,metalness:.1}));
-  board.position.set(-2.1,1.5,0); hoop.add(board);
-  const post=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,1.6,10),
-    new THREE.MeshStandardMaterial({color:C(0x8FA79A),metalness:.9,roughness:.3,envMapIntensity:2}));
-  post.position.set(-2.1,1.6,0); hoop.add(post);
-  hoop.position.set(-26,6,0); hoop.userData.own=1; world.add(hoop);
-  H.hoop=hoop; H.rail=0; H.dir=1; H.speed=H.base; H.score=0; H.time=120; H.pause=0;
+  // one hoop per team: yours at -26, theirs at +26. Both ride a rail and slide.
+  H.hoops=[]; H.speed=H.base; H.score=0; H.rival=0; H.time=180;
+  H.held=false; H.heldBy=null; H.cool=0; H.respawn=0; H.lastThrower=null;
+  [[-26,"#4ADE3C",1],[26,"#A855F7",-1]].forEach(([x,col,face],i)=>{
+    const arc=new THREE.Mesh(new THREE.RingGeometry(19.4,19.9,48,1,
+        face>0?Math.PI*.5:-Math.PI*.5,Math.PI),
+      new THREE.MeshBasicMaterial({color:C(col),transparent:true,opacity:.3,side:THREE.DoubleSide}));
+    arc.rotation.x=-Math.PI/2; arc.position.set(x,.06,0); arc.userData.own=1; world.add(arc);
+    const rail=new THREE.Mesh(new THREE.BoxGeometry(.4,.4,30),
+      new THREE.MeshStandardMaterial({color:C(0x8FA79A),metalness:.9,roughness:.3,envMapIntensity:2}));
+    rail.position.set(x+face*-2,7.4,0); rail.userData.own=1; world.add(rail);
+    const hoop=new THREE.Group();
+    const ring=new THREE.Mesh(new THREE.TorusGeometry(1.9,.16,12,30),
+      new THREE.MeshStandardMaterial({color:C(col),metalness:1,roughness:.22,
+        emissive:C(col).multiplyScalar(.25),envMapIntensity:2.6}));
+    ring.rotation.x=Math.PI/2; hoop.add(ring);
+    const board=new THREE.Mesh(new THREE.BoxGeometry(.3,3.4,4.6),
+      new THREE.MeshStandardMaterial({color:C(0xE9F4EC),transparent:true,opacity:.26,roughness:.1,metalness:.1}));
+    board.position.set(face*-2.1,1.5,0); hoop.add(board);
+    const post=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,1.6,10),
+      new THREE.MeshStandardMaterial({color:C(0x8FA79A),metalness:.9,roughness:.3,envMapIntensity:2}));
+    post.position.set(face*-2.1,1.6,0); hoop.add(post);
+    hoop.position.set(x,6,0); hoop.userData.own=1; world.add(hoop);
+    H.hoops.push({g:hoop,x,rail:i?7:-7,dir:i?-1:1,speed:H.base,pause:0,owner:i?"b":"p",col});
+  });
   // the ball
   const ball=new THREE.Mesh(new THREE.SphereGeometry(.85,20,16),
     new THREE.MeshStandardMaterial({color:C(0xF5B60D),roughness:.5,metalness:.25,emissive:C(0x4a3500),envMapIntensity:1.6}));
@@ -1171,52 +1252,98 @@ function buildHoops(){
   P.pos.set(12,1,0); P.hp=P.max=B().hp; P.ammo=3; P.at=0; P.at2=0; P.sup=0; P.dash=0; P.alive=true;
   if(P.blob)world.remove(P.blob.group);
   P.blob=makeBlob(B().color,SK().v,1.15); world.add(P.blob.group);
-  addPlayerRing();
+  addPlayerRing(); addAimLine();
   const pal=["#A855F7","#3B82F6"].filter(c=>c!==B().color);
   addBot(new THREE.Vector3(-8,1,10),pal[0],"classic");
   addBot(new THREE.Vector3(-8,1,-10),pal[1]||"#EF4444","void");
-  bots.forEach(b=>{b.hp=b.max=260;});
+  bots.forEach(b=>{b.hp=b.max=260; b.carry=false;});
   G.kills=0; G.gold0=save.gold;
 }
-function resetBall(){ H.ball.position.set(4,1.4,0); H.vel.set(0,0,0); }
+function resetBall(){ H.ball.position.set(0,1.4,0); H.vel.set(0,0,0);
+  H.held=false; H.heldBy=null; H.cool=.6; bots.forEach(b=>b.carry=false); }
+function dropBall(){ if(!H.held)return; H.held=false;
+  const c=H.heldBy==="p"?P.pos:(H.heldBy&&H.heldBy.pos);
+  if(c){ H.ball.position.set(c.x,1.4,c.z); }
+  if(H.heldBy&&H.heldBy!=="p")H.heldBy.carry=false;
+  H.heldBy=null; H.cool=.45; }
+/* Distance to the hoop you are facing, so the throw arcs the right length.
+   Direction stays entirely yours — and the hoop is sliding, so you still have
+   to lead it. Only the power is worked out for you. */
+function aimedHoopDist(from,dir){
+  let best=0, bestDot=.5;
+  H.hoops.forEach(h=>{
+    const to=new THREE.Vector3(h.g.position.x-from.x,0,h.g.position.z-from.z);
+    const d=to.length(); if(d<1)return;
+    const dot=to.normalize().dot(dir);
+    if(dot>bestDot){ bestDot=dot; best=d; }
+  });
+  return best||14;
+}
+function throwBall(from,dir,dist){
+  H.held=false; if(H.heldBy&&H.heldBy!=="p")H.heldBy.carry=false;
+  H.lastThrower=H.heldBy; H.lastShotFrom=from.clone(); H.heldBy=null; H.cool=.3;
+  const D=clamp(dist||14,4,34), T=clamp(.55+D*.035,.7,1.5);
+  const RIM=6.0, Y0=1.95;
+  H.ball.position.set(from.x+dir.x*1.4,Y0,from.z+dir.z*1.4);
+  H.vel.set(dir.x*(D/T), (RIM-Y0+8.5*T*T)/T, dir.z*(D/T));   // arcs through rim height
+  burst(H.ball.position.clone(),8,4,"#F5B60D",.35,1); }
 function updateHoops(dt){
   updatePlayer(dt); updateBots(dt); updateBullets(dt);
-  // hoop slides along the back line, and pauses briefly after a score
-  if(H.pause>0){ H.pause-=dt; }
-  else { H.rail+=H.dir*H.speed*dt;
-    if(H.rail>14){H.rail=14;H.dir=-1;} if(H.rail<-14){H.rail=-14;H.dir=1;} }
-  H.hoop.position.z=H.rail;
-  H.hoop.children[0].rotation.z+=dt*.6;
-  // ball physics
+  // respawn
+  if(H.respawn>0){ H.respawn-=dt;
+    if(H.respawn<=0){ P.alive=true; P.hp=P.max; P.ammo=3; P.pos.set(14,1,0);
+      P.vel.set(0,0,0); world.add(P.blob.group); toast("Back in!",B().color); } }
+  // both hoops slide along their back line; each pauses after it is scored in
+  H.hoops.forEach(h=>{
+    if(h.pause>0){ h.pause-=dt; }
+    else { h.rail+=h.dir*h.speed*dt;
+      if(h.rail>14){h.rail=14;h.dir=-1;} if(h.rail<-14){h.rail=-14;h.dir=1;} }
+    h.g.position.z=h.rail; h.g.children[0].rotation.z+=dt*.6;
+  });
+  if(H.cool>0)H.cool-=dt;
   const b=H.ball;
-  H.vel.y-=17*dt;
-  b.position.addScaledVector(H.vel,dt);
-  if(b.position.y<.85){ b.position.y=.85; H.vel.y*=-.55; H.vel.x*=.88; H.vel.z*=.88; }
+  // carried? the ball rides in front of whoever has it
+  if(H.held){
+    const c=H.heldBy==="p"?{pos:P.pos,aim:P.aim}:{pos:H.heldBy.pos,aim:H.heldBy.aim};
+    if(H.heldBy!=="p"&&!H.heldBy.alive){ dropBall(); }
+    else { b.position.set(c.pos.x+c.aim.x*1.5,1.95+Math.sin(G.t*6)*.12,c.pos.z+c.aim.z*1.5);
+      b.rotation.y+=dt*2; H.vel.set(0,0,0); }
+  }
+  // ball physics
+  if(!H.held) H.vel.y-=17*dt;
+  if(!H.held) b.position.addScaledVector(H.vel,dt);
+  if(!H.held&&b.position.y<.85){ b.position.y=.85; H.vel.y*=-.55; H.vel.x*=.88; H.vel.z*=.88; }
   if(Math.abs(b.position.x)>32){ b.position.x=Math.sign(b.position.x)*32; H.vel.x*=-.7; }
   if(Math.abs(b.position.z)>32){ b.position.z=Math.sign(b.position.z)*32; H.vel.z*=-.7; }
-  b.rotation.x+=H.vel.z*dt*.5; b.rotation.z-=H.vel.x*dt*.5;
-  // player bumps the ball
-  const pd=Math.hypot(b.position.x-P.pos.x,b.position.z-P.pos.z);
-  if(pd<2.0){ const d=new THREE.Vector3(b.position.x-P.pos.x,0,b.position.z-P.pos.z).normalize();
-    H.vel.addScaledVector(d,9); H.vel.y=Math.max(H.vel.y,4); }
+  if(!H.held){ b.rotation.x+=H.vel.z*dt*.5; b.rotation.z-=H.vel.x*dt*.5; }
+  // walk into a loose ball to pick it up
+  if(!H.held&&H.cool<=0&&P.alive&&b.position.y<3.2&&
+     Math.hypot(b.position.x-P.pos.x,b.position.z-P.pos.z)<2.3){
+    H.held=true; H.heldBy="p"; H.lastThrower=null;
+    burst(b.position.clone(),10,5,B().color,.4,1.1); toast("Got the ball!",B().color);
+  }
   // bullets push the ball — this is the whole mode: you never carry it, you shoot it
   for(let i=bullets.length-1;i>=0;i--){ const bu=bullets[i];
-    if(bu.m.position.distanceTo(b.position)<1.35){
+    if(!H.held&&bu.m.position.distanceTo(b.position)<1.35){
       H.vel.addScaledVector(bu.dir,bu.sp*.42); H.vel.y+=7.5;
-      H.lastShotFrom=P.pos.clone();
+      H.lastThrower="p"; H.lastShotFrom=P.pos.clone();
       impact3(bu.m.position.clone(),bu.fx); killBullet(bu,bu.m.position.clone()); } }
-  // through the hoop?
-  const hp=H.hoop.position;
-  if(H.vel.y<0 && Math.abs(b.position.y-hp.y)<.7 &&
-     Math.hypot(b.position.x-hp.x,b.position.z-hp.z)<1.75){
-    const far=H.lastShotFrom?Math.hypot(H.lastShotFrom.x-hp.x,H.lastShotFrom.z-hp.z)>19.6:false;
-    const pts=far?3:2; H.score+=pts;
-    save.gold+=pts*8; persist(); hudGold();
-    toast(far?"THREE!":"Score!", far?"#F5B60D":"#4ADE3C");
-    burst(hp.clone(),34,11,"#F5B60D",.9,2); ring(new THREE.Vector3(hp.x,.1,hp.z),"#F5B60D",7,.6);
-    H.speed=Math.min(H.base*2,H.speed*1.15); H.pause=1.5;   // faster every time you score
-    resetBall();
-    if(H.score>=15) endMatch(true);
+  // through a hoop?
+  if(!H.held&&H.vel.y<0) for(const h of H.hoops){
+    const hp=h.g.position;
+    if(Math.abs(b.position.y-hp.y)<.95 && Math.hypot(b.position.x-hp.x,b.position.z-hp.z)<1.95){
+      const far=H.lastShotFrom?Math.hypot(H.lastShotFrom.x-hp.x,H.lastShotFrom.z-hp.z)>19.6:false;
+      const pts=far?3:2;
+      const mine = h.owner==="p";
+      if(mine){ H.score+=pts; save.gold+=pts*8; persist(); hudGold();
+        toast(far?"THREE POINTER!":"Score!", far?"#F5B60D":"#4ADE3C"); }
+      else { H.rival+=pts; toast("They scored "+pts,"#F87171"); }
+      burst(hp.clone(),34,11,h.col,.9,2); ring(new THREE.Vector3(hp.x,.1,hp.z),h.col,7,.6);
+      h.speed=Math.min(H.base*2,h.speed*1.15); h.pause=1.5;  // that hoop gets harder
+      resetBall();
+      if(H.score>=WIN_SCORE||H.rival>=WIN_SCORE) endMatch(H.score>=WIN_SCORE);
+      break;
+    }
   }
 }
 
@@ -1242,7 +1369,7 @@ function endMatch(win){
   $("overTitle").textContent=win?"Victory":"Splatted";
   $("overTitle").style.color=win?"#4ADE3C":"#F87171";
   $("overText").innerHTML = G.mode==="hoops"
-    ? `${H.score} points · <b style="color:#F5B60D">+${earned} gold</b>`
+    ? `${H.score} — ${H.rival} · <b style="color:#F5B60D">+${earned} gold</b>`
     : `${G.kills} splats · <b style="color:#F5B60D">+${earned} gold</b>`;
   $("over").classList.remove("hidden");
 }
@@ -1358,9 +1485,11 @@ function frame(now){
     if(G.mode==="hoops"){
       updateHoops(dt);
       H.time-=dt;
-      $("modeMain").textContent=H.score+" / 15";
-      $("modeSub").textContent="BLOB HOOPS · "+Math.max(0,Math.ceil(H.time))+"s";
-      if(H.time<=0)endMatch(H.score>=15);
+      $("modeMain").innerHTML='<span style="color:'+B().color+'">'+H.score+
+        '</span> — <span style="color:#F87171">'+H.rival+'</span>';
+      $("modeSub").textContent="FIRST TO "+WIN_SCORE+" · "+Math.max(0,Math.ceil(H.time))+"s"
+        +(H.held?(H.heldBy==="p"?" · YOU HAVE THE BALL":" · THEY HAVE THE BALL"):"");
+      if(H.time<=0)endMatch(H.score>H.rival);
     } else {
       updatePlayer(dt); updateBots(dt); updateBullets(dt); updateDig(dt);
     }
