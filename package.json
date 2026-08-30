@@ -2,9 +2,13 @@
   "name": "blob-mania",
   "version": "1.0.0",
   "private": true,
-  "description": "Blob Mania — a 3D arena brawler for the web",
+  "description": "Blob Mania \u2014 a 3D arena brawler for the web. \u00a9 2026 Sam Kennedy.",
   "scripts": {
     "start": "node server.js"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  },
+  "author": "Sam Kennedy",
+  "license": "UNLICENSED"
 }

@@ -796,3 +796,8 @@ seasonal maps · spectating · replays · paid random crates · anything that se
 
 All fine ideas for v2. None of them makes the first playable better, and each one is a place a
 small project goes to die.
+
+---
+
+**Blob Mania — copyright © 2026 Sam Kennedy. All rights reserved.**
+This design document and the game it describes are the original work of Sam Kennedy.

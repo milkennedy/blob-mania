@@ -1,4 +1,10 @@
 <!doctype html>
+<!--
+  Blob Mania
+  Copyright © 2026 Sam Kennedy. All rights reserved.
+  Original game design, code and artwork by Sam Kennedy.
+  Includes three.js (© 2010-2021 three.js authors, MIT) in public/vendor.
+-->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -107,6 +113,9 @@
     pointer-events:none;padding:18px}
   #menu > *{pointer-events:auto}
   .lobbyTop{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+  .copyright{font-family:var(--mono);font-size:10px;letter-spacing:.11em;color:var(--muted);
+    margin-top:7px;opacity:.75}
+  @media (max-height:520px){.copyright{display:none}}
   .lobbyTop h1{font-family:var(--display);font-size:clamp(30px,5vw,52px);font-weight:800;margin:0;
     letter-spacing:-.01em;text-shadow:0 4px 24px rgba(0,0,0,.6)}
   .lobbyTop .gold{font-family:var(--mono);color:var(--gold);font-weight:600;font-size:14px;
@@ -229,7 +238,10 @@
 
 <div id="menu">
   <div class="lobbyTop">
-    <h1>Blob Mania</h1>
+    <div>
+      <h1>Blob Mania</h1>
+      <div class="copyright">© 2026 Sam Kennedy · all rights reserved</div>
+    </div>
     <div class="gold">◈ <span id="goldMenuNum">0</span> gold</div>
   </div>
 

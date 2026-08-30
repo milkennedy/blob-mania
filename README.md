@@ -94,3 +94,9 @@ Two things to know before you change anything:
 `docs/DESIGN.md` is the plan. The big one still ahead is **multiplayer** — real friends, parties,
 and even teams — which needs an authoritative server. Everything else (more modes, sound, more
 arenas) is smaller than that.
+
+---
+
+**Blob Mania — copyright © 2026 Sam Kennedy. All rights reserved.**
+Original game design, code and artwork by Sam Kennedy. See [LICENSE](LICENSE).
+Includes [three.js](https://threejs.org) (© 2010–2021 three.js authors, MIT).
