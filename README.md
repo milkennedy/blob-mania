@@ -33,6 +33,8 @@ menu and it opens full-screen with its own icon, no browser bars.
 - **Difficulty** — Easy, Medium, Hard or Grandmaster, chosen in the lobby. Harder rivals are
   faster, tougher, more accurate and more numerous, and they pay more gold and XP. Grandmaster
   aims where you're going.
+- **The Golden Egg** — hidden in every arena until you find it. Inside is the Golden Slug: a
+  one-shot cannon with a laser sight, three shells a match, kept on your profile forever.
 - **Levels** — each brawler levels 1–10 by being played (damage, splats, goals, digs, wins), and
   each level is +5% health and +5% damage on that brawler. Levels are earned, never bought.
 - **Four modes** — Dig & Fight, and three sports on real marked courts: Blob Hoops (first to 6,

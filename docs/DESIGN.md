@@ -271,6 +271,16 @@ The playable build (`public/index.html`) implements this slice:
   cannot move or shoot.
 - **Aimed supers.** Every super lands where you point, and while your super is charged a ring
   shows exactly where it will go before you spend it.
+- **The Golden Egg.** Hidden somewhere in every Dig & Fight arena until you find it, tucked
+  against a tree or a wall rather than sitting in the open. Crack it and you keep what's inside
+  forever: the **Golden Slug**, a one-shot cannon with a **laser sight** — the only line the game
+  draws, and only while the Slug is loaded. It splats any blob it touches, instantly, whatever
+  its level or difficulty. **Three shells a match**, refilled each round. Once you own it, eggs
+  still turn up in about a quarter of matches and pay 250 gold instead.
+  *Two judgement calls, both easy to reverse:* the weapon is a golden cannon rather than a real
+  firearm, because the spec keeps this game at Mild with no realistic weapons (§14) and the
+  world is goo blasters; and three shells a match keeps it a treasure rather than a switch that
+  turns the game off.
 - **The harpoon.** Right-click, `F`, or the HARPOON button fires a spear on a rope, on a 7-second
   cooldown, and it does three different things depending on what it sticks into: a **blob** takes
   40 damage and gets reeled to you; a **tree, crate or crystal** reels *you* to it, so it doubles
