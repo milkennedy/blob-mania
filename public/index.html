@@ -2,7 +2,15 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Blob Mania">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#070E0B">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
 <title>Blob Mania</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -59,6 +67,34 @@
     border:2px solid rgba(233,244,236,.55)}
   #hint{position:absolute;left:50%;transform:translateX(-50%);bottom:18px;font-size:10.5px;
     color:var(--muted);letter-spacing:.08em;text-align:center}
+  body.touch #hint{bottom:8px;font-size:9.5px}
+  body.touch #crosshair{display:none}
+  #tbtns{position:absolute;right:14px;bottom:74px;display:none;flex-direction:column;gap:11px;
+    pointer-events:auto}
+  body.touch #tbtns{display:flex}
+  .tb{width:72px;height:72px;border-radius:50%;border:2px solid var(--line);background:var(--panel);
+    color:var(--text);font-family:var(--display);font-weight:800;font-size:13px;letter-spacing:.03em;
+    backdrop-filter:blur(8px);-webkit-tap-highlight-color:transparent;touch-action:none}
+  .tb:active{transform:scale(.94)}
+  .tb.ready{border-color:var(--gold);color:var(--gold)}
+  .tb[disabled]{opacity:.3}
+  #rotate{position:fixed;inset:0;display:none;flex-direction:column;align-items:center;
+    justify-content:center;gap:14px;background:var(--ink);z-index:50;text-align:center;padding:30px}
+  #rotate .ph{width:52px;height:86px;border:3px solid var(--green);border-radius:10px;
+    animation:tip 1.8s ease-in-out infinite}
+  @keyframes tip{0%,40%{transform:rotate(0)}60%,100%{transform:rotate(-90deg)}}
+  #rotate p{font-family:var(--display);font-size:21px;font-weight:800;margin:0}
+  #rotate small{color:var(--muted);font-family:var(--body);font-size:13px}
+  @media (orientation:portrait){ body.touch.playing #rotate{display:flex} }
+  /* on a short phone screen the three buttons must not eat the whole side */
+  @media (max-height:520px){
+    #tbtns{gap:8px;bottom:12px}
+    .tb{width:58px;height:58px;font-size:11px}
+    #goldBox{padding:7px 11px;font-size:12px;bottom:12px;right:96px}
+    #mini canvas{width:112px;height:112px}
+    #hpBox{width:212px;padding:9px 11px}
+    #supBox{width:186px;padding:9px 11px;right:96px}
+  }
 
   /* ---------------- MENU ---------------- */
   #menu{position:fixed;inset:0;overflow:auto;background:
@@ -140,7 +176,14 @@
   <div id="toasts"></div>
   <div id="crosshair"></div>
   <div id="hint">W A S D move · mouse aim · click shoot · shift dash · space super · E dig · ESC menu</div>
+  <div id="tbtns">
+    <button class="tb" id="bDig" disabled>DIG</button>
+    <button class="tb" id="bSuper" disabled>SUPER</button>
+    <button class="tb" id="bDash">DASH</button>
+  </div>
 </div>
+<div id="rotate"><div class="ph"></div><p>Turn your phone sideways</p>
+  <small>Blob Mania plays in landscape.</small></div>
 
 <div id="touch" class="hidden"></div>
 
@@ -153,10 +196,16 @@
       <h2>Mode</h2>
       <div id="modeList"></div>
       <button id="play">Play</button>
-      <div class="keys">
+      <div class="keys" id="keysDesk">
         <b>WASD</b> move · <b>Mouse</b> aim<br>
         <b>Click</b> shoot · <b>Shift</b> dash<br>
         <b>Space</b> super · <b>E</b> dig
+      </div>
+      <div class="keys hidden" id="keysTouch">
+        <b>Drag left</b> to move<br>
+        <b>Tap right</b> to shoot<br>
+        <b>Buttons</b> for dash, super and dig<br>
+        Play with the phone sideways.
       </div>
       <div id="goldMenu">◈ <span id="goldMenuNum">0</span> gold</div>
     </div>
@@ -681,6 +730,24 @@ renderer.domElement.addEventListener("touchend",e=>{
   for(const t of e.changedTouches){ if(stick&&t.identifier===stick.id){stick=null;touchLayer.classList.add("hidden");}
     else mouse.down=false; }});
 
+/* ---- touch device: on-screen buttons instead of a keyboard ---- */
+const TOUCH = matchMedia("(pointer:coarse)").matches || navigator.maxTouchPoints>0;
+let touchDig=false;
+if(TOUCH){
+  document.body.classList.add("touch");
+  $q("#hint").textContent="Drag the left side to move · tap the right side to shoot";
+  const hold=(el,down,up)=>{
+    el.addEventListener("touchstart",e=>{e.preventDefault();e.stopPropagation();down();},{passive:false});
+    el.addEventListener("touchend",e=>{e.preventDefault();e.stopPropagation();if(up)up();},{passive:false});
+    el.addEventListener("mousedown",e=>{e.preventDefault();e.stopPropagation();down();});
+    el.addEventListener("mouseup",e=>{e.preventDefault();if(up)up();});
+  };
+  hold($q("#bDash"),()=>doDash());
+  hold($q("#bSuper"),()=>useSuper());
+  hold($q("#bDig"),()=>{touchDig=true;},()=>{touchDig=false;});
+}
+function $q(sel){ return document.querySelector(sel); }
+
 /* ---- world building ---- */
 function addCrate(x,z){
   const m=new THREE.Mesh(new THREE.BoxGeometry(2.6,2.6,2.6),
@@ -989,7 +1056,7 @@ function updateDig(dt){
   mounds.forEach(m=>{ const d=Math.hypot(P.pos.x-m.pos.x,P.pos.z-m.pos.z); if(d<4&&d<nd){nd=d;near=m;} });
   if(!near||!P.alive){ box.classList.add("hidden"); mounds.forEach(m=>m.prog=0); return; }
   box.classList.remove("hidden");
-  if(keys.e){ near.prog+=dt/1.2;
+  if(keys.e||touchDig){ near.prog+=dt/1.2;
     if(Math.random()<.5)spark(near.pos.x,.4,near.pos.z,(Math.random()-.5)*3,2+Math.random()*2,
       (Math.random()-.5)*3,.5,"#8B6508",1.1);
     if(near.prog>=1){ near.prog=0; near.digs++;
@@ -1004,7 +1071,7 @@ function updateDig(dt){
       placeMound(near);
     } }
   else near.prog=Math.max(0,near.prog-dt*2);
-  document.getElementById("digTxt").textContent="HOLD E · DIG "+(near.digs+1)+"/3";
+  document.getElementById("digTxt").textContent=(TOUCH?"HOLD DIG · ":"HOLD E · ")+"DIG "+(near.digs+1)+"/3";
   box.querySelector("i").style.width=(near.prog*100)+"%";
 }
 function updateCamera(dt){
@@ -1036,7 +1103,13 @@ function updateHUD(){
   $("supBar").firstElementChild.style.width=P.sup+"%";
   const d=$("dash");
   if(P.dash>0){ d.className="cool"; d.textContent="DASH "+P.dash.toFixed(1)+"s"; }
-  else { d.className=""; d.textContent="DASH READY · SHIFT"; }
+  else { d.className=""; d.textContent=TOUCH?"DASH READY":"DASH READY · SHIFT"; }
+  if(TOUCH){
+    const bs=$("bSuper"), bd=$("bDash"), bg=$("bDig");
+    bs.disabled=P.sup<100; bs.className="tb"+(P.sup>=100?" ready":"");
+    bd.disabled=P.dash>0;
+    bg.disabled=$("digBox").classList.contains("hidden");
+  }
   if(G.mode==="arena"){
     const left=bots.filter(b2=>b2.alive).length+(P.alive?1:0);
     $("modeMain").textContent=left+" blobs left"; $("modeSub").textContent="LAST BLOB STANDING";
@@ -1160,10 +1233,10 @@ function startMatch(mode){
   if(mode==="hoops")buildHoops(); else buildArena();
   camera.position.copy(P.pos.clone().add(new THREE.Vector3(0,21,15.5)));
   $("menu").classList.add("hidden"); $("hud").classList.remove("hidden"); $("over").classList.add("hidden");
-  G.running=true; hudGold();
+  G.running=true; document.body.classList.add("playing"); hudGold();
 }
 function endMatch(win){
-  if(G.over)return; G.over=true; G.running=false;
+  if(G.over)return; G.over=true; G.running=false; document.body.classList.remove("playing");
   let earned=G.mode==="hoops"?(win?150:60):(win?100:35);
   save.gold+=earned; persist(); hudGold();
   $("overTitle").textContent=win?"Victory":"Splatted";
@@ -1174,7 +1247,7 @@ function endMatch(win){
   $("over").classList.remove("hidden");
 }
 function toMenu(){
-  G.running=false; clearWorld();
+  G.running=false; document.body.classList.remove("playing"); clearWorld();
   $("hud").classList.add("hidden"); $("over").classList.add("hidden"); $("menu").classList.remove("hidden");
   buildMenu();
 }
@@ -1302,6 +1375,8 @@ function frame(now){
   }
   requestAnimationFrame(frame);
 }
+if(TOUCH){ document.getElementById("keysDesk").classList.add("hidden");
+  document.getElementById("keysTouch").classList.remove("hidden"); }
 skinsOwned("green"); buildMenu(); requestAnimationFrame(frame);
 </script>
 </body>
