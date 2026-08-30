@@ -1,0 +1,902 @@
+<title>Blob Mania</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Karla:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+  :root{
+    --ink:#0A130F; --panel:#132019; --panel-2:#1A2A21; --line:#25392E;
+    --text:#E9F4EC; --muted:#7C9789; --dim:#4E6659;
+    --green:#4ADE3C; --purple:#A855F7; --blue:#3B82F6; --yellow:#FACC15; --gold:#F5B60D;
+    --common:#7C9789; --rare:#4EA8DE; --epic:#A855F7; --legend:#F5B60D; --mythic:#FFE9A3;
+    --display:"Baloo 2",system-ui,sans-serif;
+    --body:"Karla",system-ui,-apple-system,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box}
+  body{background:var(--ink);color:var(--text);font-family:var(--body);line-height:1.6;margin:0}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 20px 90px}
+  h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.1}
+  a{color:var(--green)}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+  section{margin-top:64px}
+  .sec-head{border-bottom:1px solid var(--line);padding-bottom:14px;margin-bottom:26px}
+  .sec-head h2{font-size:30px}
+  .sec-head p{color:var(--muted);margin:8px 0 0;max-width:62ch}
+
+  /* ---------- hero ---------- */
+  header.hero{padding:52px 0 8px;position:relative;overflow:hidden}
+  header.hero::after{content:"";position:absolute;inset:auto -10% 0;height:220px;
+    background:radial-gradient(60% 100% at 50% 100%,rgba(74,222,60,.10),transparent 70%);pointer-events:none}
+  .hero h1{font-size:clamp(40px,7vw,74px);letter-spacing:-.01em}
+  .hero h1 .sub{display:block;font-size:.42em;color:var(--gold);letter-spacing:.06em;margin-top:2px}
+  .hero p.lede{max-width:60ch;font-size:18px;color:#C6D9CC;margin:16px 0 0}
+  .hero .tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+  .tag{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    border:1px solid var(--line);border-radius:999px;padding:5px 11px;color:var(--muted);background:var(--panel)}
+
+  /* ---------- game ---------- */
+  .game{margin-top:30px;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .stage{position:relative;background:#08110D}
+  canvas#arena{display:block;width:100%;height:auto;touch-action:none;cursor:crosshair}
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:14px;background:rgba(8,17,13,.86);backdrop-filter:blur(3px);text-align:center;padding:24px}
+  .overlay[hidden]{display:none}
+  .overlay h3{font-size:26px}
+  .overlay .keys{font-family:var(--mono);font-size:12.5px;color:var(--muted);line-height:2}
+  .overlay .keys b{color:var(--text);background:var(--panel-2);border:1px solid var(--line);
+    border-radius:5px;padding:2px 7px;font-weight:600}
+  .btn{font-family:var(--display);font-weight:800;font-size:16px;background:var(--green);color:#06210A;
+    border:0;border-radius:10px;padding:11px 26px;cursor:pointer;letter-spacing:.02em}
+  .btn:hover{filter:brightness(1.1)}
+  .btn:focus-visible,.chip:focus-visible,.sizebtn:focus-visible,.ghost:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+  .ghost{font-family:var(--body);font-weight:600;font-size:13px;background:transparent;color:var(--muted);
+    border:1px solid var(--line);border-radius:8px;padding:8px 14px;cursor:pointer}
+  .ghost:hover{color:var(--text);border-color:var(--muted)}
+
+  .controls{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--line)}
+  .ctl{padding:16px 18px}
+  .ctl+.ctl{border-left:1px solid var(--line)}
+  .ctl h4{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 10px;font-weight:400}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{font-family:var(--body);font-size:12.5px;font-weight:600;background:var(--panel-2);color:var(--muted);
+    border:1px solid var(--line);border-radius:8px;padding:6px 11px;cursor:pointer;display:flex;align-items:center;gap:7px}
+  .chip:hover{color:var(--text)}
+  .chip .dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .chip[aria-pressed="true"]{color:#06210A;background:var(--text);border-color:var(--text)}
+  .chip[disabled]{opacity:.38;cursor:not-allowed}
+  .chip .lock{font-size:10px;opacity:.8}
+  .parity{font-size:12.5px;color:var(--muted);margin:12px 0 0;border-left:2px solid var(--green);padding-left:11px}
+  .parity b{color:var(--text);font-family:var(--mono);font-size:12px}
+
+  /* ---------- cards ---------- */
+  .grid{display:grid;gap:14px}
+  .blobs{grid-template-columns:repeat(auto-fit,minmax(196px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+  .card h3{font-size:19px;display:flex;align-items:center;gap:9px}
+  .card h3 .swatch{width:15px;height:15px;border-radius:50%;flex:none}
+  .rar{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;margin-top:6px;display:block}
+  .stats{list-style:none;padding:0;margin:12px 0 0;font-size:13px}
+  .stats li{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-top:1px solid var(--line)}
+  .stats li span:last-child{font-family:var(--mono);font-size:12px;color:var(--text);font-variant-numeric:tabular-nums}
+  .stats li span:first-child{color:var(--muted)}
+  .card .weapon{font-size:13px;color:#C6D9CC;margin:10px 0 0}
+
+  /* ---------- dig ladder ---------- */
+  .ladder{display:flex;align-items:stretch;gap:10px;overflow-x:auto;padding-bottom:6px}
+  .step{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;min-width:150px;flex:1}
+  .step .blobdot{width:26px;height:26px;border-radius:50%;margin-bottom:9px}
+  .step b{font-family:var(--display);font-size:16px;display:block}
+  .step .price{font-family:var(--mono);font-size:12px;color:var(--gold);margin-top:4px;display:block}
+  .step small{color:var(--muted);font-size:12px;display:block;margin-top:6px}
+  .arrowcell{display:flex;align-items:center;color:var(--dim);font-family:var(--mono);font-size:11px;
+    letter-spacing:.1em;flex:none;padding:0 2px;text-align:center}
+
+  /* ---------- modes ---------- */
+  .modes{grid-template-columns:repeat(auto-fit,minmax(268px,1fr))}
+  .mode svg{display:block;width:100%;height:96px;background:#0C1712;border-radius:8px;border:1px solid var(--line)}
+  .mode h3{font-size:18px;margin-top:13px}
+  .mode .kind{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .mode p{font-size:13.5px;color:#C6D9CC;margin:8px 0 0}
+  .mode .twist{font-size:12.5px;color:var(--muted);margin:9px 0 0;border-top:1px solid var(--line);padding-top:9px}
+  .mode .twist b{color:var(--gold);font-weight:600}
+  .rule{background:linear-gradient(180deg,var(--panel-2),var(--panel));border:1px solid var(--line);
+    border-left:3px solid var(--gold);border-radius:12px;padding:20px 22px;margin-bottom:22px}
+  .rule p{margin:0;font-size:20px;font-family:var(--display);font-weight:600;line-height:1.35}
+  .rule small{display:block;color:var(--muted);font-family:var(--body);font-size:13.5px;margin-top:9px;max-width:64ch}
+
+  /* ---------- party ---------- */
+  .partywrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:14px}
+  .sizebtns{display:flex;gap:7px;flex-wrap:wrap;margin-top:4px}
+  .sizebtn{font-family:var(--mono);font-size:13px;font-weight:600;background:var(--panel-2);color:var(--muted);
+    border:1px solid var(--line);border-radius:8px;padding:9px 13px;cursor:pointer}
+  .sizebtn[aria-pressed="true"]{background:var(--green);color:#06210A;border-color:var(--green)}
+  .slot{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);
+    border-radius:9px;background:var(--panel-2);font-size:13.5px;margin-top:7px}
+  .slot .av{width:22px;height:22px;border-radius:50%;flex:none;background:var(--dim)}
+  .slot.bot{color:var(--muted);border-style:dashed;background:transparent}
+  .slot .role{margin-left:auto;font-family:var(--mono);font-size:10px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--muted)}
+  .teams{display:grid;gap:9px}
+  .teamrow{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:11px 13px}
+  .teamrow .tname{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--muted);display:flex;justify-content:space-between}
+  .pips{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+  .pip{width:30px;height:30px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;
+    font-size:10px;font-family:var(--mono);color:var(--ink);font-weight:600}
+  .pip.bot{background:transparent;color:var(--dim);border-style:dashed}
+  .vs{text-align:center;font-family:var(--display);font-size:15px;color:var(--muted)}
+  .warn{margin-top:12px;font-size:13px;border-radius:9px;padding:11px 13px;display:flex;
+    gap:10px;align-items:center;flex-wrap:wrap}
+  .warn.ok{background:rgba(74,222,60,.09);border:1px solid rgba(74,222,60,.3);color:#BFE9BA}
+  .warn.bad{background:rgba(250,204,21,.09);border:1px solid rgba(250,204,21,.32);color:#F0DFA6}
+  .warn button{margin-left:auto}
+
+  .skinset{margin-top:26px}
+  .skinset h3{font-size:19px;display:flex;align-items:center;gap:9px;margin-bottom:12px}
+  .skinset h3 .swatch{width:14px;height:14px;border-radius:50%}
+  .skingrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+  @media (min-width:900px){.skingrid{grid-template-columns:repeat(5,1fr)}}
+  figure.skin{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  figure.skin canvas{display:block;width:100%;height:auto;background:#08110D;border-bottom:1px solid var(--line)}
+  figure.skin figcaption{padding:12px 13px 14px}
+  figure.skin .top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  figure.skin b{font-family:var(--display);font-size:16px}
+  figure.skin .rr{font-family:var(--mono);font-size:9.5px;letter-spacing:.11em;text-transform:uppercase}
+  figure.skin em{display:block;font-style:normal;font-family:var(--mono);font-size:11px;color:var(--text);margin-top:5px}
+  figure.skin p{margin:5px 0 0;font-size:12.5px;color:var(--muted);line-height:1.5}
+  .note{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;font-size:14px;color:#C6D9CC}
+  .note h3{font-size:17px;margin-bottom:8px}
+  .note ul{margin:8px 0 0;padding-left:18px}
+  .note li{margin:5px 0}
+  footer{margin-top:70px;border-top:1px solid var(--line);padding-top:20px;color:var(--dim);font-size:12.5px}
+  @media (max-width:760px){
+    .controls{grid-template-columns:1fr}
+    .ctl+.ctl{border-left:0;border-top:1px solid var(--line)}
+    .partywrap{grid-template-columns:1fr}
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <p class="eyebrow">Design preview · built from the build prompt</p>
+    <h1>Blob Mania<span class="sub">DIG &amp; FIGHT</span></h1>
+    <p class="lede">You're a blob in an arena full of blobs. Dig to discover new brawlers, spend gold to
+      unlock them, and chase skins where the shot changes how it <em>looks</em> — never what it does.</p>
+    <div class="tags">
+      <span class="tag">Roblox</span><span class="tag">5 brawlers</span><span class="tag">25 skins</span>
+      <span class="tag">6 modes</span><span class="tag">1v1 – 5v5</span><span class="tag">Parties</span>
+    </div>
+
+    <div class="game">
+      <div class="stage">
+        <canvas id="arena" width="920" height="520" aria-label="Playable Blob Mania preview arena"></canvas>
+        <div class="overlay" id="overlay">
+          <h3 id="ovTitle">Blob Mania — playable preview</h3>
+          <p class="keys" id="ovKeys">
+            <b>W A S D</b> move &nbsp; <b>Mouse</b> aim &nbsp; <b>Click</b> shoot<br>
+            <b>Shift</b> dash &nbsp; <b>Space</b> super &nbsp; <b>E</b> dig at a mound<br>
+            <span style="color:var(--dim)">On a phone: drag the left half to move, tap the right half to shoot</span>
+          </p>
+          <button class="btn" id="startBtn">Play</button>
+        </div>
+      </div>
+      <div class="controls">
+        <div class="ctl">
+          <h4>Brawler — dig in the arena to discover the next one</h4>
+          <div class="chips" id="blobChips"></div>
+          <p class="parity">Gold counts up as you play. Three digs at one mound discovers the next brawler.
+            <button class="ghost" id="unlockAll" style="margin-left:6px">Preview all 5</button></p>
+        </div>
+        <div class="ctl">
+          <h4>Skin — changes the shot's look, never its damage</h4>
+          <div class="chips" id="skinChips"></div>
+          <p class="parity">Damage this shot: <b id="dmgReadout">45 × 3</b> — identical on all five skins.
+            The damage code never even receives the skin.</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Section 03</p>
+      <h2>The five blobs</h2>
+      <p>Discovered in a fixed order, never randomly. Green is free. Gold costs a million.</p>
+    </div>
+    <div class="grid blobs" id="blobCards"></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Section 04</p>
+      <h2>Dig to discover</h2>
+      <p>Digging reveals a brawler. Gold buys it. Two goals at once, so a dig is never wasted.</p>
+    </div>
+    <div class="ladder" id="ladder"></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Section 05</p>
+      <h2>Six ways to play</h2>
+      <p>One arena mode, one boss fight, four sports. All of them run on the same skill.</p>
+    </div>
+    <div class="rule">
+      <p>You never carry the ball. You shoot it.</p>
+      <small>No pickup, no dribble, no possession. The ball is a physics object and your blaster is how you
+        move it — passing is just shooting to a teammate. That single rule turns four sports into four
+        aiming games, and it's what makes them ours rather than a sports sim with blobs pasted on.</small>
+    </div>
+    <div class="grid modes" id="modeCards"></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Section 06</p>
+      <h2>Party up, fair sides</h2>
+      <p>Invite friends, pick your size, and the teams are always even — the game will not start 5v1.</p>
+    </div>
+    <div class="partywrap">
+      <div class="card">
+        <h4 style="font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 8px;font-weight:400">Team size</h4>
+        <div class="sizebtns" id="sizeBtns"></div>
+        <h4 style="font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:20px 0 2px;font-weight:400">Your party</h4>
+        <div id="partyList"></div>
+        <div class="chips" id="friendList" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <h4 style="font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 10px;font-weight:400">The match that would start</h4>
+        <div class="teams">
+          <div class="teamrow">
+            <div class="tname"><span>Your team</span><span id="aCount"></span></div>
+            <div class="pips" id="teamA"></div>
+          </div>
+          <div class="vs">versus</div>
+          <div class="teamrow">
+            <div class="tname"><span>Their team</span><span id="bCount"></span></div>
+            <div class="pips" id="teamB"></div>
+          </div>
+        </div>
+        <div class="warn ok" id="partyWarn"></div>
+        <p style="font-size:12.5px;color:var(--muted);margin:14px 0 0">If someone quits mid-match an AI blob
+          takes their slot the same second, so the sides never drift apart. An uneven team isn't a
+          challenge — it's a bad time for six people.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow">Section 09</p>
+      <h2>All 25 skins</h2>
+      <p>Every skin's shot, playing on a loop. Same damage on all five in a set — only the show changes.
+        These are the real effects from the game above, drawn by the same code.</p>
+    </div>
+    <div id="skinGallery"></div>
+  </section>
+
+  <section>
+    <div class="note">
+      <h3>What this is</h3>
+      <p style="margin:0">This page is built from the build prompt, not from Sam's <code>blob_brawl_dig.html</code>
+        — I haven't got that file, so nothing here is copied from it. It's a preview of how the Roblox
+        version reads: the feel of the shooting, the five brawlers, the dig, the sports modes and the party
+        rules, all running off the same numbers written in the doc.</p>
+      <ul>
+        <li><b>Real in this preview:</b> movement, aiming, shooting, dashing, all five supers, all 25 skin
+          effects, digging to discover, crates, bushes, gold.</li>
+        <li><b>Sketched, not built:</b> the sports fields, other players, saving to a Roblox account.</li>
+        <li><b>Everything here is original.</b> No other game's names, art, sounds or screens — sports
+          themselves belong to everyone, and blobs are ours.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>Blob Mania: Dig &amp; Fight — design preview for Sam. Numbers match
+    <code>docs/sam-game/BLOB_BRAWL_BUILD_PROMPT.md</code>.</footer>
+</div>
+
+<script>
+"use strict";
+/* ============================ DATA ============================ */
+const BLOBS = [
+  {id:"green", name:"Green Blob", rarity:"Starter", rarCol:"var(--common)", color:"#4ADE3C", hp:500, speed:150,
+   weapon:"Plasma Blaster", dmg:45, pellets:3, spread:.20, rof:.50, reload:1.6, bs:520, price:0, priceTxt:"Free",
+   sup:"Toxic Bloom", supTxt:"Poison pool, 20/s for 6s"},
+  {id:"purple", name:"Purple Blob", rarity:"Rare", rarCol:"var(--rare)", color:"#A855F7", hp:450, speed:150,
+   weapon:"Void Cannon", dmg:130, pellets:1, spread:0, rof:.83, reload:1.6, bs:470, price:500, priceTxt:"500 gold",
+   sup:"Singularity", supTxt:"Pulls enemies in, then pops"},
+  {id:"blue", name:"Blue Blob", rarity:"Epic", rarCol:"var(--epic)", color:"#3B82F6", hp:380, speed:141,
+   weapon:"Frost Rifle", dmg:145, pellets:1, spread:0, rof:1.0, reload:1.6, bs:640, pierce:2, price:700, priceTxt:"700 gold",
+   sup:"Glacier Wall", supTxt:"An ice wall of cover, 8s"},
+  {id:"yellow", name:"Yellow Blob", rarity:"Legendary", rarCol:"var(--legend)", color:"#FACC15", hp:470, speed:160,
+   weapon:"Solar Burst", dmg:32, pellets:5, spread:.13, rof:.38, reload:1.1, bs:560, price:1000, priceTxt:"1,000 gold",
+   sup:"Solar Flare", supTxt:"Cone of burn, 130 over 3s"},
+  {id:"gold", name:"Gold Blob", rarity:"Mythic", rarCol:"var(--mythic)", color:"#F5B60D", hp:800, speed:122,
+   weapon:"Golden Cannon", dmg:200, pellets:1, spread:0, rof:1.43, reload:2.4, bs:400, splash:46, price:1000000,
+   priceTxt:"1,000,000 gold", sup:"Golden Meteor", supTxt:"Shockwave + knockback"}
+];
+const R = {Common:"var(--common)",Rare:"var(--rare)",Epic:"var(--epic)",Legendary:"var(--legend)",Mythic:"var(--mythic)"};
+// fx: c=core colour, t=trail colour, shape, impact
+const SKINS = {
+  green:[
+    {n:"Classic Green",  r:"Common",    e:"Plasma Bolt",   fx:{c:"#4ADE3C",t:"#8CFF7A",shape:"orb",   impact:"sparks"}},
+    {n:"Emerald Green",  r:"Rare",      e:"Emerald Shards",fx:{c:"#10B981",t:"#6EE7B7",shape:"shard", impact:"shards"}},
+    {n:"Diamond Green",  r:"Epic",      e:"Diamond Beam",  fx:{c:"#BFFCFF",t:"#7DD3FC",shape:"beam",  impact:"diamond"}},
+    {n:"Gold Green",     r:"Epic",      e:"Golden Plasma", fx:{c:"#F5B60D",t:"#FDE68A",shape:"orb",   impact:"coins"}},
+    {n:"Toxic Green",    r:"Legendary", e:"Toxic Slime",   fx:{c:"#A3E635",t:"#65A30D",shape:"blob",  impact:"poison"}}],
+  purple:[
+    {n:"Classic Purple", r:"Common",    e:"Void Bolt",     fx:{c:"#A855F7",t:"#D8B4FE",shape:"orb",   impact:"dark"}},
+    {n:"Amethyst",       r:"Rare",      e:"Crystal Burst", fx:{c:"#C084FC",t:"#F0ABFC",shape:"shard", impact:"shards"}},
+    {n:"Diamond Purple", r:"Epic",      e:"Diamond Pulse", fx:{c:"#E0F2FE",t:"#A5B4FC",shape:"beam",  impact:"ring"}},
+    {n:"Royal Purple",   r:"Epic",      e:"Royal Blast",   fx:{c:"#7C3AED",t:"#F5B60D",shape:"orb",   impact:"crown"}},
+    {n:"Void Purple",    r:"Legendary", e:"Black Hole Shot",fx:{c:"#4C1D95",t:"#312E81",shape:"orb",  impact:"blackhole"}}],
+  blue:[
+    {n:"Classic Blue",   r:"Common",    e:"Ice Bolt",      fx:{c:"#3B82F6",t:"#93C5FD",shape:"orb",   impact:"frost"}},
+    {n:"Sapphire",       r:"Rare",      e:"Sapphire Shard",fx:{c:"#1D4ED8",t:"#60A5FA",shape:"shard", impact:"shards"}},
+    {n:"Diamond Blue",   r:"Epic",      e:"Diamond Ray",   fx:{c:"#E0FBFF",t:"#67E8F9",shape:"beam",  impact:"diamond"}},
+    {n:"Electric Blue",  r:"Epic",      e:"Lightning Shot",fx:{c:"#38BDF8",t:"#FDE047",shape:"bolt",  impact:"chain"}},
+    {n:"Frozen Blue",    r:"Legendary", e:"Frost Cannon",  fx:{c:"#A5F3FC",t:"#FFFFFF",shape:"flake", impact:"frost"}}],
+  yellow:[
+    {n:"Classic Yellow", r:"Common",    e:"Solar Shot",    fx:{c:"#FACC15",t:"#FEF08A",shape:"orb",   impact:"sparks"}},
+    {n:"Diamond Yellow", r:"Rare",      e:"Prism Beam",    fx:{c:"#FFFFFF",t:"#F472B6",shape:"beam",  impact:"prism"}},
+    {n:"Gold Yellow",    r:"Epic",      e:"Gold Burst",    fx:{c:"#F5B60D",t:"#FDE68A",shape:"orb",   impact:"coins"}},
+    {n:"Solar Yellow",   r:"Epic",      e:"Sun Ray",       fx:{c:"#FB923C",t:"#FDE047",shape:"sun",   impact:"fire"}},
+    {n:"Emerald Yellow", r:"Legendary", e:"Emerald Comet", fx:{c:"#BEF264",t:"#4ADE3C",shape:"comet", impact:"shards"}}],
+  gold:[
+    {n:"Classic Gold",   r:"Common",    e:"Golden Cannonball",fx:{c:"#F5B60D",t:"#FDE68A",shape:"ball",impact:"heavy"}},
+    {n:"Diamond Gold",   r:"Rare",      e:"Diamond Nova",  fx:{c:"#EAFBFF",t:"#F5B60D",shape:"ball",  impact:"diamond"}},
+    {n:"Emerald Gold",   r:"Epic",      e:"Emerald Beam",  fx:{c:"#34D399",t:"#F5B60D",shape:"beam",  impact:"shards"}},
+    {n:"Ruby Gold",      r:"Epic",      e:"Ruby Explosion",fx:{c:"#EF4444",t:"#F5B60D",shape:"ball",  impact:"ruby"}},
+    {n:"Ultimate Golden",r:"Mythic",    e:"Golden Meteor", fx:{c:"#FFE9A3",t:"#F5B60D",shape:"meteor",impact:"shock"}}]
+};
+const MODES = [
+  {k:"Core mode", n:"Last Blob Standing", d:"Up to 10 blobs, no respawns, dig sites live. A goo tide shrinks the arena every 30 seconds.", t:"Works at any player count — never waits for a full lobby.", svg:"lbs"},
+  {k:"Sports · 3v3", n:"Blob Kickoff", d:"A goo ball and a net at each end. Shoot the ball in. First to 3, or ahead at 3:00.", t:"The ball <b>charges</b> as it's hit — five hits and it splats the first defender it touches.", svg:"kick"},
+  {k:"Sports · 3v3", n:"Blob Hoops", d:"One hoop each end, and it will not hold still. Shoot the ball through a moving target. First to 15.", t:"The hoop <b>rides a rail across the back line, sliding side to side</b> — and it speeds up every time you score.", svg:"hoops"},
+  {k:"Sports · 3v3", n:"Blob Volley", d:"A goo net down the middle. Don't let the ball touch your floor. Rally scoring, first to 5.", t:"<b>Three touches</b> a side, and your Super is a spike.", svg:"volley"},
+  {k:"Sports · 3v3", n:"Blob Puck", d:"A low-friction goo rink and a flat puck. First to 3, or ahead at 3:00.", t:"<b>Everything slides</b> — puck and players. Dash is a legal body check.", svg:"puck"},
+  {k:"Event", n:"Boss Blobs", d:"A huge elite blob guards a guaranteed brawler dig site. Slow, telegraphed, 250 gold.", t:"Anyone can fight it. <b>Anyone can steal the dig</b> once it's down.", svg:"boss"}
+];
+const SVGS = {
+  lbs:`<svg viewBox="0 0 240 96" role="img" aria-label="Shrinking arena with blobs"><rect x="6" y="6" width="228" height="84" rx="6" fill="none" stroke="#25392E"/><rect x="34" y="18" width="172" height="60" rx="4" fill="none" stroke="#4ADE3C" stroke-dasharray="5 5" opacity=".8"/><circle cx="80" cy="40" r="7" fill="#4ADE3C"/><circle cx="150" cy="58" r="7" fill="#A855F7"/><circle cx="120" cy="32" r="7" fill="#3B82F6"/><circle cx="176" cy="40" r="7" fill="#FACC15"/></svg>`,
+  kick:`<svg viewBox="0 0 240 96" role="img" aria-label="Pitch with two nets"><rect x="6" y="6" width="228" height="84" rx="6" fill="none" stroke="#25392E"/><line x1="120" y1="6" x2="120" y2="90" stroke="#25392E"/><rect x="6" y="32" width="12" height="32" fill="none" stroke="#4ADE3C"/><rect x="222" y="32" width="12" height="32" fill="none" stroke="#A855F7"/><circle cx="120" cy="48" r="8" fill="#F5B60D"/><circle cx="120" cy="48" r="13" fill="none" stroke="#F5B60D" opacity=".45"/><circle cx="70" cy="60" r="6" fill="#4ADE3C"/><circle cx="172" cy="36" r="6" fill="#A855F7"/></svg>`,
+  hoops:`<svg viewBox="0 0 240 96" role="img" aria-label="Court with hoops that slide along the back line"><rect x="6" y="6" width="228" height="84" rx="6" fill="none" stroke="#25392E"/><line x1="20" y1="14" x2="20" y2="82" stroke="#25392E" stroke-dasharray="3 4"/><line x1="220" y1="14" x2="220" y2="82" stroke="#25392E" stroke-dasharray="3 4"/><path d="M52 14 A44 40 0 0 1 52 82" fill="none" stroke="#25392E"/><path d="M188 14 A44 40 0 0 0 188 82" fill="none" stroke="#25392E"/><ellipse cx="20" cy="40" rx="5" ry="11" fill="none" stroke="#4ADE3C" stroke-width="2"/><path d="M20 58 v14 M14 66 h12" stroke="#4ADE3C" opacity=".55" stroke-linecap="round"/><ellipse cx="220" cy="56" rx="5" ry="11" fill="none" stroke="#A855F7" stroke-width="2"/><path d="M220 30 v-14 M214 22 h12" stroke="#A855F7" opacity=".55" stroke-linecap="round"/><circle cx="120" cy="48" r="8" fill="#F5B60D"/><text x="120" y="88" fill="#7C9789" font-size="8" font-family="monospace" text-anchor="middle">hoops slide · 3 beyond the arc</text></svg>`,
+  volley:`<svg viewBox="0 0 240 96" role="img" aria-label="Net across the middle"><rect x="6" y="6" width="228" height="84" rx="6" fill="none" stroke="#25392E"/><line x1="120" y1="16" x2="120" y2="90" stroke="#4ADE3C" stroke-dasharray="4 4"/><path d="M56 70 Q120 6 184 70" fill="none" stroke="#F5B60D" stroke-dasharray="3 5" opacity=".8"/><circle cx="184" cy="70" r="7" fill="#F5B60D"/><circle cx="56" cy="74" r="6" fill="#4ADE3C"/><circle cx="196" cy="42" r="6" fill="#A855F7"/></svg>`,
+  puck:`<svg viewBox="0 0 240 96" role="img" aria-label="Ice rink with sliding puck"><rect x="6" y="6" width="228" height="84" rx="20" fill="none" stroke="#25392E"/><line x1="120" y1="10" x2="120" y2="86" stroke="#3B82F6" opacity=".4"/><rect x="8" y="36" width="10" height="24" fill="none" stroke="#4ADE3C"/><rect x="222" y="36" width="10" height="24" fill="none" stroke="#A855F7"/><ellipse cx="150" cy="48" rx="9" ry="4" fill="#E9F4EC"/><line x1="96" y1="48" x2="138" y2="48" stroke="#E9F4EC" stroke-dasharray="3 6" opacity=".55"/><circle cx="80" cy="48" r="6" fill="#3B82F6"/></svg>`,
+  boss:`<svg viewBox="0 0 240 96" role="img" aria-label="Boss blob guarding a dig site"><rect x="6" y="6" width="228" height="84" rx="6" fill="none" stroke="#25392E"/><circle cx="120" cy="48" r="22" fill="#F5B60D" opacity=".22"/><circle cx="120" cy="48" r="16" fill="#F5B60D"/><path d="M112 66 h16" stroke="#8B6508" stroke-width="3"/><circle cx="62" cy="40" r="6" fill="#4ADE3C"/><circle cx="182" cy="58" r="6" fill="#3B82F6"/><circle cx="70" cy="70" r="6" fill="#A855F7"/></svg>`
+};
+
+/* ============================ SAVE ============================ */
+const SAVE_KEY="blobbrawl.preview.v1";
+let save={gold:0,found:["green"]};
+try{const raw=localStorage.getItem(SAVE_KEY);if(raw){const p=JSON.parse(raw);
+  if(p&&Array.isArray(p.found)){save.found=p.found;save.gold=+p.gold||0;}}}catch(e){}
+function persist(){try{localStorage.setItem(SAVE_KEY,JSON.stringify(save));}catch(e){}}
+const has=id=>save.found.indexOf(id)>-1;
+
+/* ============================ STATIC UI ============================ */
+const el=id=>document.getElementById(id);
+el("blobCards").innerHTML=BLOBS.map(b=>`
+  <article class="card">
+    <h3><span class="swatch" style="background:${b.color}"></span>${b.name}</h3>
+    <span class="rar" style="color:${b.rarCol}">${b.rarity} · ${b.priceTxt}</span>
+    <p class="weapon"><b>${b.weapon}</b> — ${b.pellets>1?b.dmg+" × "+b.pellets:b.dmg} damage${b.pierce?", pierces 2":""}${b.splash?", splash":""}</p>
+    <ul class="stats">
+      <li><span>Health</span><span>${b.hp}</span></li>
+      <li><span>Speed</span><span>${(b.speed/9.4).toFixed(0)} studs/s</span></li>
+      <li><span>Reload</span><span>${b.reload.toFixed(1)}s</span></li>
+      <li><span>Super</span><span>${b.sup}</span></li>
+    </ul>
+    <p class="weapon" style="color:var(--muted);font-size:12.5px">${b.supTxt}</p>
+  </article>`).join("");
+
+el("ladder").innerHTML=BLOBS.map((b,i)=>`
+  ${i?'<div class="arrowcell">DIG ×3 →</div>':""}
+  <div class="step">
+    <div class="blobdot" style="background:${b.color}"></div>
+    <b>${b.name}</b><span class="price">${b.priceTxt}</span>
+    <small>${i?"Dig it up, then buy it":"Unlocked from the start"}</small>
+  </div>`).join("");
+
+el("modeCards").innerHTML=MODES.map(m=>`
+  <article class="card mode">${SVGS[m.svg]}
+    <span class="kind">${m.k}</span><h3>${m.n}</h3><p>${m.d}</p><p class="twist">${m.t}</p>
+  </article>`).join("");
+
+/* ============================ PARTY ============================ */
+const FRIENDS=["Riley","Jordan","Ash","Mo","Kai","Nia"];
+let teamSize=3, party=["Sam"];
+el("sizeBtns").innerHTML=[1,2,3,4,5].map(n=>`<button class="sizebtn" data-n="${n}" aria-pressed="${n===3}">${n}v${n}</button>`).join("");
+el("sizeBtns").addEventListener("click",e=>{const b=e.target.closest("[data-n]");if(!b)return;teamSize=+b.dataset.n;drawParty();});
+el("friendList").addEventListener("click",e=>{const b=e.target.closest("[data-f]");if(!b)return;
+  const f=b.dataset.f;const i=party.indexOf(f);if(i>-1)party.splice(i,1);else if(party.length<5)party.push(f);drawParty();});
+function drawParty(){
+  [...el("sizeBtns").children].forEach(b=>b.setAttribute("aria-pressed",+b.dataset.n===teamSize));
+  el("partyList").innerHTML=party.map((p,i)=>`<div class="slot"><span class="av" style="background:${
+    ["#4ADE3C","#A855F7","#3B82F6","#FACC15","#F5B60D"][i]}"></span>${p}<span class="role">${i?"member":"leader"}</span></div>`).join("");
+  el("friendList").innerHTML=FRIENDS.map(f=>{const inP=party.indexOf(f)>-1;
+    return `<button class="chip" data-f="${f}" aria-pressed="${inP}" ${(!inP&&party.length>=5)?"disabled":""}>${inP?"✓ ":"+ "}${f}</button>`;}).join("");
+  const fits=party.length<=teamSize;
+  const mine=[], theirs=[];
+  for(let i=0;i<teamSize;i++){
+    mine.push(i<party.length&&fits?{n:party[i][0],bot:false,c:["#4ADE3C","#A855F7","#3B82F6","#FACC15","#F5B60D"][i]}:{n:"AI",bot:true});
+    theirs.push(i===0?{n:"P",bot:false,c:"#94A3B8"}:{n:"AI",bot:true});
+  }
+  const pips=a=>a.map(p=>`<span class="pip ${p.bot?"bot":""}" ${p.bot?"":`style="background:${p.c}"`}>${p.n}</span>`).join("");
+  el("teamA").innerHTML=pips(mine); el("teamB").innerHTML=pips(theirs);
+  el("aCount").textContent=teamSize+" blobs"; el("bCount").textContent=teamSize+" blobs";
+  const w=el("partyWarn");
+  if(!fits){ w.className="warn bad";
+    w.innerHTML=`Your party has ${party.length} blobs. Pick ${party.length}v${party.length} or bigger.
+      <button class="ghost" id="bump">Switch to ${party.length}v${party.length}</button>`;
+    el("bump").onclick=()=>{teamSize=party.length;drawParty();};
+  } else { w.className="warn ok";
+    w.innerHTML=`Ready — ${teamSize} v ${teamSize}. Your party plays on the same team, and AI blobs fill the
+      ${teamSize*2-party.length-1} open slot${teamSize*2-party.length-1===1?"":"s"} so both sides stay even.`;
+  }
+}
+drawParty();
+
+/* ============================ GAME ============================ */
+const cv=el("arena"), ctx=cv.getContext("2d");
+const W=cv.width, H=cv.height;
+let running=false, last=0, t=0;
+let cur=0, skinIx=0;
+const P={x:W/2,y:H/2,r:16,hp:500,max:500,ammo:3,at:0,sup:0,dash:0,dashT:0,dx:0,dy:0,dead:0};
+let bullets=[],ebullets=[],parts=[],splats=[],enemies=[],crates=[],bushes=[],pools=[],walls=[],toasts=[];
+const digSite={x:0,y:0,digs:0,prog:0};
+const keys={}, mouse={x:W/2,y:0,down:false};
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const dist=(a,b,c,d)=>Math.hypot(a-c,b-d);
+const blob=()=>BLOBS[cur], skin=()=>SKINS[blob().id][skinIx];
+
+function layout(){
+  crates=[]; bushes=[]; walls=[];
+  const spots=[[150,120],[770,120],[150,400],[770,400],[460,90],[460,430]];
+  spots.forEach(s=>crates.push({x:s[0],y:s[1],r:19,hp:150}));
+  [[300,260],[620,260],[460,180]].forEach(s=>bushes.push({x:s[0],y:s[1],r:52}));
+  moveDig();
+}
+function moveDig(){ let n=0;
+  do{ digSite.x=rnd(90,W-90); digSite.y=rnd(90,H-90); n++; }
+  while(n<50&&crates.some(c=>dist(digSite.x,digSite.y,c.x,c.y)<58));
+  digSite.prog=0; }
+function spawnEnemies(){ enemies=[]; for(let i=0;i<4;i++) addEnemy(); }
+function addEnemy(){
+  // rivals never wear your colour — you should always find yourself instantly
+  const pal=["#A855F7","#3B82F6","#FACC15","#4ADE3C","#F97316"].filter(x=>x!==blob().color);
+  const c=pal[enemies.length%pal.length];
+  let x,y,tries=0; do{x=rnd(60,W-60);y=rnd(60,H-60);tries++;}while(dist(x,y,P.x,P.y)<220&&tries<40);
+  enemies.push({x,y,r:15,hp:160,max:160,c,vx:rnd(-40,40),vy:rnd(-40,40),ct:rnd(1,3),slow:0,burn:0});
+}
+function reset(){
+  const b=blob(); P.max=b.hp; P.hp=b.hp; P.x=W/2; P.y=H-90; P.ammo=3; P.at=0; P.sup=0; P.dash=0; P.dead=0;
+  bullets=[];ebullets=[];parts=[];pools=[];splats=[];toasts=[];
+  layout(); spawnEnemies();
+}
+function toast(msg,col){ toasts.push({m:msg,c:col||"#E9F4EC",life:3}); }
+
+/* ---- input ---- */
+addEventListener("keydown",e=>{
+  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].indexOf(e.key)>-1&&running)e.preventDefault();
+  keys[e.key.toLowerCase()]=true;
+  if(e.key===" "&&running)useSuper();
+  if(e.key.toLowerCase()==="shift"&&running)doDash();
+});
+addEventListener("keyup",e=>{keys[e.key.toLowerCase()]=false;});
+function pos(ev){const r=cv.getBoundingClientRect();return{x:(ev.clientX-r.left)*(W/r.width),y:(ev.clientY-r.top)*(H/r.height)};}
+cv.addEventListener("mousemove",e=>{const p=pos(e);mouse.x=p.x;mouse.y=p.y;});
+cv.addEventListener("mousedown",e=>{e.preventDefault();mouse.down=true;});
+addEventListener("mouseup",()=>{mouse.down=false;});
+let touchMove=null;
+cv.addEventListener("touchstart",e=>{e.preventDefault();for(const tc of e.changedTouches){const p=pos(tc);
+  if(p.x<W/2)touchMove={id:tc.identifier,ox:p.x,oy:p.y,x:p.x,y:p.y};else{mouse.x=p.x;mouse.y=p.y;mouse.down=true;}}},{passive:false});
+cv.addEventListener("touchmove",e=>{e.preventDefault();for(const tc of e.changedTouches){const p=pos(tc);
+  if(touchMove&&tc.identifier===touchMove.id){touchMove.x=p.x;touchMove.y=p.y;}else{mouse.x=p.x;mouse.y=p.y;}}},{passive:false});
+cv.addEventListener("touchend",e=>{for(const tc of e.changedTouches){
+  if(touchMove&&tc.identifier===touchMove.id)touchMove=null;else mouse.down=false;}});
+
+/* ---- actions ---- */
+function fire(){
+  const b=blob(); if(P.ammo<1||P.at>0||P.dead)return;
+  P.ammo--; P.at=b.rof;
+  const a=Math.atan2(mouse.y-P.y,mouse.x-P.x);
+  for(let i=0;i<b.pellets;i++){
+    const off=b.pellets>1?(i-(b.pellets-1)/2)*b.spread:0;
+    bullets.push({x:P.x+Math.cos(a)*20,y:P.y+Math.sin(a)*20,a:a+off,sp:b.bs,r:b.splash?9:6,
+      life:1.1,hits:b.pierce||1,fx:skin().fx,dmg:b.dmg,splash:b.splash||0,tr:0});
+  }
+}
+function doDash(){ if(P.dash>0||P.dead)return; P.dash=4; P.dashT=.18;
+  const a=Math.atan2(mouse.y-P.y,mouse.x-P.x); P.dx=Math.cos(a)*760; P.dy=Math.sin(a)*760;
+  for(let i=0;i<10;i++)parts.push({x:P.x,y:P.y,vx:rnd(-60,60),vy:rnd(-60,60),life:.4,c:blob().color,r:3});
+}
+function useSuper(){
+  if(P.sup<100||P.dead)return; P.sup=0;
+  const id=blob().id, a=Math.atan2(mouse.y-P.y,mouse.x-P.x);
+  const tx=P.x+Math.cos(a)*170, ty=P.y+Math.sin(a)*170;
+  if(id==="green"){ pools.push({x:tx,y:ty,r:74,life:6,c:"#A3E635"}); toast("Toxic Bloom","#A3E635"); }
+  if(id==="purple"){ pools.push({x:tx,y:ty,r:96,life:1.5,c:"#A855F7",pull:true,pop:100}); toast("Singularity","#A855F7"); }
+  if(id==="blue"){ walls.push({x:tx,y:ty,a:a+Math.PI/2,len:96,life:8}); toast("Glacier Wall","#A5F3FC"); }
+  if(id==="yellow"){ enemies.forEach(e=>{const d=Math.atan2(e.y-P.y,e.x-P.x);
+      let da=Math.abs(((d-a+Math.PI*3)%(Math.PI*2))-Math.PI);
+      if(dist(e.x,e.y,P.x,P.y)<230&&da<0.52){e.burn=3;}});
+    for(let i=0;i<44;i++){const sp=rnd(90,260),d=a+rnd(-.5,.5);
+      parts.push({x:P.x,y:P.y,vx:Math.cos(d)*sp,vy:Math.sin(d)*sp,life:rnd(.4,.8),c:i%2?"#FB923C":"#FDE047",r:rnd(2,5)});}
+    toast("Solar Flare","#FB923C"); }
+  if(id==="gold"){ enemies.forEach(e=>{const d=dist(e.x,e.y,P.x,P.y);
+      if(d<200){hurt(e,180);const ang=Math.atan2(e.y-P.y,e.x-P.x);e.x+=Math.cos(ang)*60;e.y+=Math.sin(ang)*60;}});
+    pools.push({x:P.x,y:P.y,r:10,life:.5,c:"#F5B60D",ring:true}); toast("Golden Meteor","#F5B60D"); }
+}
+function hurt(e,d){
+  e.hp-=d; P.sup=Math.min(100,P.sup+d*0.18);
+  if(e.hp<=0){ splats.push({x:e.x,y:e.y,r:e.r*1.7,life:4,c:e.c}); save.gold+=10; persist();
+    for(let i=0;i<18;i++)parts.push({x:e.x,y:e.y,vx:rnd(-160,160),vy:rnd(-160,160),life:rnd(.3,.7),c:e.c,r:rnd(2,5)});
+    enemies.splice(enemies.indexOf(e),1); setTimeout(()=>{if(running)addEnemy();},1600); }
+}
+function impact(x,y,fx){ spawnImpact(parts,pools,x,y,fx,enemies); }
+function spawnImpact(PA,PO,x,y,fx,foes){
+  const K=fx.impact, c=fx.c, t2=fx.t, add=(n,f)=>{for(let i=0;i<n;i++)PA.push(f(i));};
+  foes=foes||[];
+  const base=(sp,life,col,r)=>{const a=Math.random()*Math.PI*2;
+    return{x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,life,c:col,r};};
+  if(K==="sparks") add(12,()=>base(rnd(60,190),rnd(.2,.45),Math.random()<.5?c:t2,rnd(1.5,3.5)));
+  else if(K==="shards") add(4,i=>{const a=i/4*Math.PI*2;return{x,y,vx:Math.cos(a)*180,vy:Math.sin(a)*180,life:.5,c:c,r:4,sq:true};});
+  else if(K==="diamond") add(8,i=>{const a=i/8*Math.PI*2;return{x,y,vx:Math.cos(a)*150,vy:Math.sin(a)*150,life:.42,c:i%2?c:t2,r:4,sq:true};});
+  else if(K==="coins") add(10,()=>base(rnd(70,170),rnd(.3,.6),"#F5B60D",3.4));
+  else if(K==="poison"){PO.push({x,y,r:34,life:2.4,c:"#65A30D",soft:true});add(8,()=>base(rnd(30,90),.6,"#A3E635",4));}
+  else if(K==="dark"){add(14,()=>base(rnd(40,150),.5,Math.random()<.5?"#4C1D95":c,rnd(2,5)));}
+  else if(K==="ring"||K==="prism") PO.push({x,y,r:8,life:.42,c:K==="prism"?"#F472B6":t2,ring:true});
+  else if(K==="crown"){add(9,i=>{const a=-Math.PI/2+(i-4)*.28;return{x,y,vx:Math.cos(a)*160,vy:Math.sin(a)*160,life:.55,c:i%2?"#F5B60D":c,r:3.5};});}
+  else if(K==="blackhole") PO.push({x,y,r:30,life:.7,c:"#1E1B4B",hole:true});
+  else if(K==="frost"){add(10,()=>base(rnd(40,130),.55,Math.random()<.5?"#A5F3FC":"#FFFFFF",rnd(2,4)));}
+  else if(K==="chain"){ let n=0; foes.forEach(e=>{ if(n<2&&dist(e.x,e.y,x,y)<130){n++;
+      PA.push({x,y,vx:0,vy:0,life:.22,c:"#FDE047",r:2,line:{x:e.x,y:e.y}});}}); add(6,()=>base(rnd(60,140),.3,"#38BDF8",2.5)); }
+  else if(K==="fire") add(14,()=>base(rnd(50,170),rnd(.25,.6),Math.random()<.5?"#FB923C":"#FDE047",rnd(2,5)));
+  else if(K==="ruby") add(14,()=>base(rnd(70,200),.5,Math.random()<.6?"#EF4444":"#F5B60D",rnd(2,4.5)));
+  else if(K==="heavy"){PO.push({x,y,r:6,life:.4,c:"#F5B60D",ring:true});add(10,()=>base(rnd(60,150),.4,"#FDE68A",4));}
+  else if(K==="shock"){PO.push({x,y,r:10,life:.75,c:"#FFE9A3",ring:true});add(22,()=>base(rnd(90,260),.6,Math.random()<.5?"#F5B60D":"#FFE9A3",rnd(3,6)));}
+  else add(10,()=>base(rnd(60,160),.4,c,3));
+}
+
+/* ---- update ---- */
+function update(dt){
+  t+=dt;
+  const b=blob();
+  // player move
+  let mx=0,my=0;
+  if(keys.a||keys.arrowleft)mx--; if(keys.d||keys.arrowright)mx++;
+  if(keys.w||keys.arrowup)my--; if(keys.s||keys.arrowdown)my++;
+  if(touchMove){const dx=touchMove.x-touchMove.ox,dy=touchMove.y-touchMove.oy,l=Math.hypot(dx,dy);
+    if(l>8){mx=dx/l;my=dy/l;}}
+  const l=Math.hypot(mx,my); if(l>1){mx/=l;my/=l;}
+  if(P.dashT>0){P.dashT-=dt;P.x+=P.dx*dt;P.y+=P.dy*dt;}
+  else{P.x+=mx*b.speed*dt;P.y+=my*b.speed*dt;}
+  P.x=Math.max(P.r,Math.min(W-P.r,P.x)); P.y=Math.max(P.r,Math.min(H-P.r,P.y));
+  crates.forEach(c=>{const d=dist(P.x,P.y,c.x,c.y);if(d<P.r+c.r){const a=Math.atan2(P.y-c.y,P.x-c.x);
+    P.x=c.x+Math.cos(a)*(P.r+c.r);P.y=c.y+Math.sin(a)*(P.r+c.r);}});
+  if(P.dash>0)P.dash=Math.max(0,P.dash-dt);
+  if(P.at>0)P.at-=dt;
+  if(P.ammo<3){P.at2=(P.at2||0)+dt; if(P.at2>=b.reload){P.ammo++;P.at2=0;}}
+  if(mouse.down)fire();
+  P.hidden=bushes.some(s=>dist(P.x,P.y,s.x,s.y)<s.r-6);
+
+  // digging
+  const near=dist(P.x,P.y,digSite.x,digSite.y)<46;
+  if(near&&keys.e&&!P.dead){ digSite.prog+=dt/1.2;
+    if(digSite.prog>=1){ digSite.prog=0; digSite.digs++;
+      for(let i=0;i<14;i++)parts.push({x:digSite.x,y:digSite.y,vx:rnd(-120,120),vy:rnd(-160,-20),life:.7,c:"#8B6508",r:rnd(2,5)});
+      if(digSite.digs>=3){ digSite.digs=0; const next=BLOBS.find(bb=>!has(bb.id));
+        if(next){ save.found.push(next.id); persist(); buildChips();
+          toast("Discovered the "+next.name+"!",next.color);
+          for(let i=0;i<40;i++)parts.push({x:digSite.x,y:digSite.y,vx:rnd(-220,220),vy:rnd(-260,60),life:1,c:next.color,r:rnd(2,6)});
+        } else toast("Every brawler discovered","#F5B60D");
+      } else { const g=Math.round(rnd(25,75)); save.gold+=g; persist(); toast("+"+g+" gold","#F5B60D"); }
+      moveDig();
+    }
+  } else if(!near) digSite.prog=0;
+
+  // bullets
+  bullets.forEach(p=>{ p.x+=Math.cos(p.a)*p.sp*dt; p.y+=Math.sin(p.a)*p.sp*dt; p.life-=dt; p.tr+=dt;
+    if(p.tr>.02){p.tr=0;parts.push({x:p.x,y:p.y,vx:rnd(-12,12),vy:rnd(-12,12),life:.28,c:p.fx.t,r:2.4});}
+    if(p.x<0||p.x>W||p.y<0||p.y>H)p.life=0;
+    crates.forEach(c=>{ if(p.life>0&&dist(p.x,p.y,c.x,c.y)<c.r+p.r){ c.hp-=p.dmg; impact(p.x,p.y,p.fx); p.life=0;
+      if(c.hp<=0){ save.gold+=10; persist();
+        for(let i=0;i<14;i++)parts.push({x:c.x,y:c.y,vx:rnd(-140,140),vy:rnd(-140,140),life:.6,c:"#8B6508",r:rnd(2,5)});
+        crates.splice(crates.indexOf(c),1);} }});
+    enemies.slice().forEach(e=>{ if(p.life>0&&p.hits>0&&dist(p.x,p.y,e.x,e.y)<e.r+p.r){
+      impact(p.x,p.y,p.fx); hurt(e,p.dmg); p.hits--;
+      if(p.splash) enemies.forEach(o=>{ if(o!==e&&dist(o.x,o.y,p.x,p.y)<p.splash) hurt(o,Math.round(p.dmg*.5)); });
+      if(p.fx.impact==="poison"||p.fx.impact==="frost") e.slow=1.2;
+      if(p.hits<=0)p.life=0; }});
+  });
+  bullets=bullets.filter(p=>p.life>0);
+
+  // enemies
+  enemies.forEach(e=>{
+    const sl=e.slow>0?.45:1; if(e.slow>0)e.slow-=dt;
+    if(e.burn>0){e.burn-=dt; e.bt=(e.bt||0)+dt; if(e.bt>.5){e.bt=0;hurt(e,22);} }
+    const see=!P.hidden&&dist(e.x,e.y,P.x,P.y)<360;
+    if(see){const a=Math.atan2(P.y-e.y,P.x-e.x); e.vx=Math.cos(a)*46*sl; e.vy=Math.sin(a)*46*sl;
+      e.ct-=dt; if(e.ct<=0){e.ct=rnd(1.6,2.8);
+        ebullets.push({x:e.x,y:e.y,a:a+rnd(-.12,.12),sp:230,life:2,c:e.c});}}
+    else { e.ct-=dt*.5; if(e.ct<=0){e.ct=rnd(1.5,3);e.vx=rnd(-40,40);e.vy=rnd(-40,40);} }
+    e.x+=e.vx*dt; e.y+=e.vy*dt;
+    if(e.x<e.r||e.x>W-e.r)e.vx*=-1; if(e.y<e.r||e.y>H-e.r)e.vy*=-1;
+    e.x=Math.max(e.r,Math.min(W-e.r,e.x)); e.y=Math.max(e.r,Math.min(H-e.r,e.y));
+  });
+  ebullets.forEach(p=>{ p.x+=Math.cos(p.a)*p.sp*dt; p.y+=Math.sin(p.a)*p.sp*dt; p.life-=dt;
+    walls.forEach(w=>{ const dx=p.x-w.x,dy=p.y-w.y; if(Math.abs(dx*Math.cos(w.a)+dy*Math.sin(w.a))<10&&Math.hypot(dx,dy)<w.len/2+6){p.life=0;
+      parts.push({x:p.x,y:p.y,vx:0,vy:0,life:.3,c:"#A5F3FC",r:5});}});
+    if(!P.dead&&dist(p.x,p.y,P.x,P.y)<P.r+5){ p.life=0; P.hp-=25;
+      for(let i=0;i<8;i++)parts.push({x:P.x,y:P.y,vx:rnd(-90,90),vy:rnd(-90,90),life:.4,c:p.c,r:3});
+      if(P.hp<=0){P.dead=2; splats.push({x:P.x,y:P.y,r:30,life:4,c:blob().color}); toast("Splatted — back in 2s","#F87171");} }
+  });
+  ebullets=ebullets.filter(p=>p.life>0&&p.x>0&&p.x<W&&p.y>0&&p.y<H);
+
+  if(P.dead>0){P.dead-=dt; if(P.dead<=0){P.hp=P.max;P.x=W/2;P.y=H-90;P.ammo=3;}}
+
+  pools.forEach(p=>{ p.life-=dt;
+    if(p.ring)p.r+=dt*(p.c==="#FFE9A3"?420:260);
+    if(p.pull)enemies.forEach(e=>{ if(dist(e.x,e.y,p.x,p.y)<p.r*1.6){
+      const a=Math.atan2(p.y-e.y,p.x-e.x); e.x+=Math.cos(a)*150*dt; e.y+=Math.sin(a)*150*dt;}});
+    if(p.pop&&p.life<=0)enemies.slice().forEach(e=>{if(dist(e.x,e.y,p.x,p.y)<p.r)hurt(e,p.pop);});
+    if(!p.ring&&!p.soft&&!p.hole&&!p.pull){ p.tick=(p.tick||0)+dt; if(p.tick>.5){p.tick=0;
+      enemies.slice().forEach(e=>{if(dist(e.x,e.y,p.x,p.y)<p.r)hurt(e,10);});}}
+  });
+  pools=pools.filter(p=>p.life>0);
+  walls.forEach(w=>w.life-=dt); walls=walls.filter(w=>w.life>0);
+  parts.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.94;p.vy*=.94;p.life-=dt;});
+  parts=parts.filter(p=>p.life>0);
+  splats.forEach(s=>s.life-=dt); splats=splats.filter(s=>s.life>0);
+  toasts.forEach(x=>x.life-=dt); toasts=toasts.filter(x=>x.life>0);
+}
+
+/* ---- draw ---- */
+function wob(x,y,r,c,tt,alpha,g){
+  const k=g||ctx;
+  k.save(); k.globalAlpha=alpha===undefined?1:alpha; k.fillStyle=c; k.beginPath();
+  for(let i=0;i<=22;i++){ const a=i/22*Math.PI*2, rr=r+Math.sin(a*3+tt*3)*r*.09+Math.cos(a*2-tt*2)*r*.05;
+    const px=x+Math.cos(a)*rr, py=y+Math.sin(a)*rr; i?k.lineTo(px,py):k.moveTo(px,py); }
+  k.closePath(); k.fill(); k.restore();
+}
+function face(x,y,r,look,g){
+  const k=g||ctx; k.fillStyle="#08110D"; const o=r*.32;
+  k.beginPath(); k.ellipse(x-o+look*2,y-r*.12,r*.13,r*.18,0,0,7); k.fill();
+  k.beginPath(); k.ellipse(x+o+look*2,y-r*.12,r*.13,r*.18,0,0,7); k.fill();
+}
+function paintProjectile(c,f,tt){
+  c.fillStyle=f.c; c.shadowColor=f.c; c.shadowBlur=14;
+  if(f.shape==="beam"){c.fillRect(-16,-2.5,32,5);}
+  else if(f.shape==="shard"){c.beginPath();c.moveTo(9,0);c.lineTo(-6,5);c.lineTo(-3,0);c.lineTo(-6,-5);c.closePath();c.fill();}
+  else if(f.shape==="bolt"){c.beginPath();c.moveTo(10,0);c.lineTo(0,4);c.lineTo(3,0);c.lineTo(-8,5);c.lineTo(-2,0);c.lineTo(-8,-4);c.lineTo(2,-2);c.closePath();c.fill();}
+  else if(f.shape==="flake"){for(let i=0;i<3;i++){c.save();c.rotate(i*Math.PI/3);c.fillRect(-8,-1.6,16,3.2);c.restore();}}
+  else if(f.shape==="sun"){c.beginPath();c.arc(0,0,6,0,7);c.fill();
+    c.strokeStyle=f.t;c.lineWidth=2;c.beginPath();c.arc(0,0,10,0,7);c.stroke();}
+  else if(f.shape==="comet"){c.beginPath();c.arc(0,0,5,0,7);c.fill();
+    c.fillStyle=f.t;c.globalAlpha=.6;c.beginPath();c.moveTo(-4,-4);c.lineTo(-26,0);c.lineTo(-4,4);c.closePath();c.fill();}
+  else if(f.shape==="meteor"){c.beginPath();c.arc(0,0,11,0,7);c.fill();
+    c.fillStyle=f.t;c.globalAlpha=.55;c.beginPath();c.moveTo(-8,-8);c.lineTo(-40,0);c.lineTo(-8,8);c.closePath();c.fill();}
+  else if(f.shape==="ball"){c.beginPath();c.arc(0,0,9,0,7);c.fill();
+    c.fillStyle="rgba(255,255,255,.5)";c.beginPath();c.arc(-3,-3,3,0,7);c.fill();}
+  else if(f.shape==="blob"){wob(0,0,7,f.c,tt*4,1,c);}
+  else {c.beginPath();c.arc(0,0,6,0,7);c.fill();}
+}
+function paintParticles(c,arr){
+  arr.forEach(p=>{ c.globalAlpha=Math.max(0,Math.min(1,p.life*2.2)); c.fillStyle=p.c;
+    if(p.line){c.strokeStyle=p.c;c.lineWidth=2;c.beginPath();c.moveTo(p.x,p.y);c.lineTo(p.line.x,p.line.y);c.stroke();}
+    else if(p.sq){c.save();c.translate(p.x,p.y);c.rotate(p.life*9);c.fillRect(-p.r,-p.r,p.r*2,p.r*2);c.restore();}
+    else {c.beginPath();c.arc(p.x,p.y,p.r,0,7);c.fill();} });
+  c.globalAlpha=1;
+}
+function paintPools(c,arr,tt){
+  arr.forEach(p=>{ const a=Math.max(0,Math.min(1,p.life));
+    if(p.ring){c.strokeStyle=p.c;c.globalAlpha=a;c.lineWidth=4;c.beginPath();c.arc(p.x,p.y,p.r,0,7);c.stroke();c.globalAlpha=1;}
+    else if(p.hole){c.fillStyle="#000";c.globalAlpha=a;c.beginPath();c.arc(p.x,p.y,p.r*a,0,7);c.fill();
+      c.strokeStyle="#7C3AED";c.lineWidth=3;c.stroke();c.globalAlpha=1;}
+    else{c.save();c.globalAlpha=.34*Math.min(1,a);wob(p.x,p.y,p.r,p.c,tt,undefined,c);c.restore();}});
+}
+function draw(){
+  ctx.fillStyle="#08110D"; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle="#101E17"; ctx.lineWidth=1;
+  for(let x=0;x<W;x+=46){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=46){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  ctx.strokeStyle="#25392E"; ctx.lineWidth=3; ctx.strokeRect(2,2,W-4,H-4);
+
+  splats.forEach(s=>{ctx.save();ctx.globalAlpha=Math.min(.5,s.life/4*.5);wob(s.x,s.y,s.r,s.c,t*.4);ctx.restore();});
+  paintPools(ctx,pools,t);
+  // bushes
+  bushes.forEach(s=>{ctx.save();ctx.globalAlpha=.5;wob(s.x,s.y,s.r,"#16351F",t*.5);
+    ctx.globalAlpha=.28;wob(s.x,s.y,s.r*.72,"#1E4A2A",t*.7);ctx.restore();});
+  // dig site
+  const dnear=dist(P.x,P.y,digSite.x,digSite.y)<46;
+  ctx.save(); ctx.globalAlpha=.9; wob(digSite.x,digSite.y,17,"#4A3B1E",t*.6);
+  ctx.fillStyle="#F5B60D"; ctx.globalAlpha=.5+Math.sin(t*4)*.3;
+  ctx.beginPath();ctx.arc(digSite.x,digSite.y-2,3,0,7);ctx.fill(); ctx.restore();
+  if(dnear){ ctx.strokeStyle="#F5B60D"; ctx.lineWidth=4; ctx.beginPath();
+    ctx.arc(digSite.x,digSite.y,26,-Math.PI/2,-Math.PI/2+digSite.prog*Math.PI*2); ctx.stroke();
+    ctx.fillStyle="#7C9789"; ctx.font="600 12px 'IBM Plex Mono',monospace"; ctx.textAlign="center";
+    ctx.fillText("HOLD E · dig "+(digSite.digs+1)+"/3",digSite.x,digSite.y+46); ctx.textAlign="left"; }
+  // crates
+  crates.forEach(c=>{ ctx.fillStyle="#6B4E1E"; ctx.fillRect(c.x-c.r,c.y-c.r,c.r*2,c.r*2);
+    ctx.strokeStyle="#8B6508"; ctx.lineWidth=3; ctx.strokeRect(c.x-c.r+2,c.y-c.r+2,c.r*2-4,c.r*2-4);
+    if(c.hp<150){ctx.fillStyle="rgba(0,0,0,.35)";ctx.fillRect(c.x-c.r,c.y-c.r,c.r*2,c.r*2*(1-c.hp/150));}});
+  // walls (glacier)
+  walls.forEach(w=>{ ctx.save(); ctx.translate(w.x,w.y); ctx.rotate(w.a);
+    ctx.globalAlpha=Math.min(1,w.life/2); ctx.fillStyle="#A5F3FC"; ctx.fillRect(-6,-w.len/2,12,w.len);
+    ctx.globalAlpha=Math.min(.5,w.life/2); ctx.fillStyle="#FFFFFF"; ctx.fillRect(-3,-w.len/2,4,w.len); ctx.restore(); });
+  // enemies
+  enemies.forEach(e=>{ wob(e.x,e.y,e.r,e.c,t+e.x*.01); face(e.x,e.y,e.r,0);
+    if(e.burn>0){ctx.save();ctx.globalAlpha=.5;wob(e.x,e.y,e.r*1.2,"#FB923C",t*3);ctx.restore();}
+    ctx.fillStyle="#1A2A21";ctx.fillRect(e.x-16,e.y-e.r-11,32,4);
+    ctx.fillStyle=e.c;ctx.fillRect(e.x-16,e.y-e.r-11,32*Math.max(0,e.hp/e.max),4); });
+  // player
+  if(P.dead<=0){ const b=blob();
+    wob(P.x,P.y,P.r,b.color,t,P.hidden?.45:1);
+    face(P.x,P.y,P.r,(mouse.x>P.x?1:-1));
+    const a=Math.atan2(mouse.y-P.y,mouse.x-P.x);
+    ctx.strokeStyle="rgba(233,244,236,.18)";ctx.lineWidth=2;ctx.setLineDash([5,7]);
+    ctx.beginPath();ctx.moveTo(P.x+Math.cos(a)*22,P.y+Math.sin(a)*22);
+    ctx.lineTo(P.x+Math.cos(a)*150,P.y+Math.sin(a)*150);ctx.stroke();ctx.setLineDash([]);
+    if(P.hidden){ctx.fillStyle="#7C9789";ctx.font="600 11px 'IBM Plex Mono',monospace";ctx.textAlign="center";
+      ctx.fillText("HIDDEN",P.x,P.y-P.r-14);ctx.textAlign="left";} }
+  // bullets
+  bullets.forEach(p=>{ ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.a); paintProjectile(ctx,p.fx,t); ctx.restore(); });
+  ebullets.forEach(p=>{ctx.fillStyle=p.c;ctx.globalAlpha=.85;ctx.beginPath();ctx.arc(p.x,p.y,5,0,7);ctx.fill();ctx.globalAlpha=1;});
+  // particles
+  paintParticles(ctx,parts);
+  drawHUD();
+}
+function drawHUD(){
+  const b=blob();
+  ctx.fillStyle="rgba(10,19,15,.72)"; ctx.fillRect(14,14,252,74);
+  ctx.strokeStyle="#25392E"; ctx.lineWidth=1; ctx.strokeRect(14.5,14.5,251,73);
+  ctx.font="800 15px 'Baloo 2',sans-serif"; ctx.fillStyle=b.color; ctx.fillText(b.name,26,36);
+  ctx.font="400 11px 'IBM Plex Mono',monospace"; ctx.fillStyle="#7C9789";
+  ctx.fillText(skin().e,26,52);
+  ctx.fillStyle="#1A2A21"; ctx.fillRect(26,60,180,8);
+  ctx.fillStyle=P.hp/P.max>.3?"#4ADE3C":"#F87171"; ctx.fillRect(26,60,180*Math.max(0,P.hp/P.max),8);
+  ctx.fillStyle="#E9F4EC"; ctx.font="600 11px 'IBM Plex Mono',monospace";
+  ctx.fillText(Math.max(0,Math.round(P.hp))+"/"+P.max,214,68);
+  for(let i=0;i<3;i++){ ctx.fillStyle=i<P.ammo?"#E9F4EC":"#25392E"; ctx.fillRect(26+i*22,74,18,5); }
+  // super + dash
+  ctx.fillStyle="rgba(10,19,15,.72)"; ctx.fillRect(W-186,14,172,58);
+  ctx.strokeRect(W-185.5,14.5,171,57);
+  ctx.font="400 10px 'IBM Plex Mono',monospace"; ctx.fillStyle="#7C9789";
+  ctx.fillText("SUPER · "+b.sup.toUpperCase(),W-174,30);
+  ctx.fillStyle="#1A2A21"; ctx.fillRect(W-174,36,148,7);
+  ctx.fillStyle=P.sup>=100?"#F5B60D":"#7C9789"; ctx.fillRect(W-174,36,148*(P.sup/100),7);
+  ctx.fillStyle=P.dash>0?"#4E6659":"#4ADE3C"; ctx.font="600 10px 'IBM Plex Mono',monospace";
+  ctx.fillText(P.dash>0?"DASH "+P.dash.toFixed(1)+"s":"DASH READY (SHIFT)",W-174,60);
+  // gold
+  ctx.fillStyle="rgba(10,19,15,.72)"; ctx.fillRect(W-186,H-46,172,32);
+  ctx.strokeRect(W-185.5,H-45.5,171,31);
+  ctx.fillStyle="#F5B60D"; ctx.font="600 13px 'IBM Plex Mono',monospace";
+  ctx.fillText("◈ "+save.gold.toLocaleString()+" gold",W-174,H-25);
+  // toasts
+  toasts.forEach((x,i)=>{ ctx.globalAlpha=Math.min(1,x.life); ctx.fillStyle=x.c;
+    ctx.font="800 17px 'Baloo 2',sans-serif"; ctx.textAlign="center";
+    ctx.fillText(x.m,W/2,H-70-i*26); ctx.textAlign="left"; ctx.globalAlpha=1; });
+}
+function loop(ts){
+  if(!running)return;
+  const dt=Math.min(.05,(ts-last)/1000||0); last=ts;
+  update(dt); draw(); requestAnimationFrame(loop);
+}
+
+/* ---- chips ---- */
+function buildChips(){
+  el("blobChips").innerHTML=BLOBS.map((b,i)=>{ const owned=has(b.id);
+    return `<button class="chip" data-b="${i}" aria-pressed="${i===cur}" ${owned?"":"disabled"}>
+      <span class="dot" style="background:${b.color}"></span>${b.name}${owned?"":`<span class="lock">🔒 ${b.priceTxt}</span>`}</button>`;}).join("");
+  const list=SKINS[blob().id];
+  el("skinChips").innerHTML=list.map((s,i)=>`<button class="chip" data-s="${i}" aria-pressed="${i===skinIx}">
+      <span class="dot" style="background:${s.fx.c}"></span>${s.n}
+      <span class="lock" style="color:${R[s.r]}">${s.r}</span></button>`).join("");
+  const b=blob();
+  el("dmgReadout").textContent=(b.pellets>1?b.dmg+" × "+b.pellets:String(b.dmg))+(b.splash?" splash":"");
+}
+el("blobChips").addEventListener("click",e=>{const btn=e.target.closest("[data-b]");
+  if(!btn||btn.disabled)return; cur=+btn.dataset.b; skinIx=0; buildChips(); if(running)reset();});
+el("skinChips").addEventListener("click",e=>{const btn=e.target.closest("[data-s]");
+  if(!btn)return; skinIx=+btn.dataset.s; buildChips();});
+el("unlockAll").addEventListener("click",()=>{ save.found=BLOBS.map(b=>b.id); persist(); buildChips();
+  el("unlockAll").textContent="All 5 unlocked"; });
+buildChips();
+
+/* ---- start ---- */
+el("startBtn").addEventListener("click",()=>{
+  el("overlay").hidden=true; running=true; last=performance.now(); reset(); requestAnimationFrame(loop);
+});
+layout(); draw();
+
+/* ==================== SKIN GALLERY ==================== */
+const FXDESC={
+ "Classic Green":"Green glowing orb that bursts into tiny green sparks.",
+ "Emerald Green":"A crystal shard that breaks into four emerald fragments.",
+ "Diamond Green":"Cyan-white bolt with a diamond-shaped impact.",
+ "Gold Green":"Gold projectile with a coin-spark explosion.",
+ "Toxic Green":"Splatters green poison around the impact.",
+ "Classic Purple":"Purple energy orb with a dark explosion.",
+ "Amethyst":"Purple crystals shoot outward on impact.",
+ "Diamond Purple":"A brilliant white-blue pulse ring.",
+ "Royal Purple":"Purple-and-gold shot with a crown-shaped explosion.",
+ "Void Purple":"The projectile briefly opens a tiny black hole.",
+ "Classic Blue":"Blue projectile that leaves a frosty trail.",
+ "Sapphire":"Crystal projectile that fragments on impact.",
+ "Diamond Blue":"A sparkling, laser-like shot.",
+ "Electric Blue":"Lightning arcs toward nearby enemies — for show only, no extra damage.",
+ "Frozen Blue":"Snowflake projectile that bursts into ice.",
+ "Classic Yellow":"A bright yellow energy ball.",
+ "Diamond Yellow":"Rainbow sparkles around a diamond projectile.",
+ "Gold Yellow":"Gold coins and sparks explode off the target.",
+ "Solar Yellow":"A miniature sun with a fiery ring.",
+ "Emerald Yellow":"Yellow-green crystal comet with a long trail.",
+ "Classic Gold":"Heavy gold projectile with a large impact.",
+ "Diamond Gold":"Diamond projectile that explodes into crystal rays.",
+ "Emerald Gold":"A green-and-gold energy beam.",
+ "Ruby Gold":"Red crystal blast with gold sparks.",
+ "Ultimate Golden":"Enormous glowing gold projectile with a huge golden shockwave."};
+
+const cards=[];
+el("skinGallery").innerHTML=BLOBS.map(b=>`
+  <div class="skinset">
+    <h3><span class="swatch" style="background:${b.color}"></span>${b.name}</h3>
+    <div class="skingrid">${SKINS[b.id].map((s2,i)=>`
+      <figure class="skin">
+        <canvas width="440" height="200" data-blob="${b.id}" data-i="${i}"
+          aria-label="${s2.n} — ${s2.e}"></canvas>
+        <figcaption>
+          <div class="top"><b>${s2.n}</b><span class="rr" style="color:${R[s2.r]}">${s2.r}</span></div>
+          <em>${s2.e}</em><p>${FXDESC[s2.n]||""}</p>
+        </figcaption>
+      </figure>`).join("")}</div>
+  </div>`).join("");
+
+document.querySelectorAll("#skinGallery canvas").forEach(cn=>{
+  const b=BLOBS.find(x=>x.id===cn.dataset.blob), sk=SKINS[cn.dataset.blob][+cn.dataset.i];
+  cards.push({cn,c:cn.getContext("2d"),b,sk,t:Math.random(),shots:[],fire:cards.length%5*.13,
+              parts:[],pools:[],foes:[{x:340,y:100}],vis:false,hit:0});
+});
+const io=new IntersectionObserver(es=>es.forEach(e=>{
+  const card=cards.find(c=>c.cn===e.target); if(card)card.vis=e.isIntersecting;}),{rootMargin:"120px"});
+cards.forEach(c=>io.observe(c.cn));
+
+function cardStep(c,dt){
+  const W2=440,H2=200, sx=110, tx=340, ty=100;
+  c.t+=dt;
+  // a steady stream of shots, so the card always shows its effect
+  c.fire-=dt;
+  if(c.fire<=0){ c.fire=.62; c.shots.push({x:sx+30}); }
+  c.shots.forEach(b2=>{ b2.x+=520*dt;
+    c.parts.push({x:b2.x-9,y:ty+rnd(-3,3),vx:rnd(-24,6),vy:rnd(-16,16),life:.3,c:c.sk.fx.t,r:2.5});
+    if(b2.x>=tx-10&&!b2.done){ b2.done=1; c.hit=.18;
+      spawnImpact(c.parts,c.pools,tx,ty,c.sk.fx,c.foes); } });
+  c.shots=c.shots.filter(b2=>b2.x<tx+4);
+  if(c.hit>0)c.hit-=dt;
+  c.parts.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.vx*=.94;p.vy*=.94;p.life-=dt*.78;});
+  c.parts=c.parts.filter(p=>p.life>0);
+  c.pools.forEach(p=>{p.life-=dt; if(p.ring)p.r+=dt*300;});
+  c.pools=c.pools.filter(p=>p.life>0);
+  const g=c.c;
+  g.fillStyle="#08110D"; g.fillRect(0,0,W2,H2);
+  g.strokeStyle="#101E17"; g.lineWidth=1;
+  for(let x=0;x<W2;x+=40){g.beginPath();g.moveTo(x,0);g.lineTo(x,H2);g.stroke();}
+  for(let y=0;y<H2;y+=40){g.beginPath();g.moveTo(0,y);g.lineTo(W2,y);g.stroke();}
+  paintPools(g,c.pools,c.t);
+  wob(sx,ty,26,c.b.color,c.t,1,g); face(sx,ty,26,1,g);
+  g.globalAlpha=c.hit>0?.5:1;
+  wob(tx,ty,22,"#3B4A41",c.t*.8,1,g); face(tx,ty,22,-1,g);
+  g.globalAlpha=1;
+  c.shots.forEach(b2=>{ g.save(); g.translate(b2.x,ty); paintProjectile(g,c.sk.fx,c.t); g.restore(); });
+  paintParticles(g,c.parts);
+}
+let cl=performance.now();
+function cardLoop(ts){ const dt=Math.min(.05,(ts-cl)/1000||0); cl=ts;
+  cards.forEach(c=>{ if(c.vis) cardStep(c,dt); });
+  requestAnimationFrame(cardLoop); }
+requestAnimationFrame(cardLoop);
+</script>

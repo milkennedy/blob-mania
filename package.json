@@ -1,0 +1,10 @@
+{
+  "name": "blob-mania",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Blob Mania — a 3D arena brawler for the web",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": { "node": ">=18" }
+}
