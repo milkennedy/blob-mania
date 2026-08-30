@@ -234,6 +234,32 @@ physics; the others reuse it. Volley last because 3-touch tracking and a net are
 
 ---
 
+## 5.6 What v1 of the web game actually has
+
+The playable build (`public/index.html`) implements this slice:
+
+- **A lobby you stand in.** Your blob waits on a platform wearing the skin you picked; the bar
+  along the bottom holds the mode button, the brawler and skin pickers, and Play. Changing a
+  skin changes the blob you are looking at.
+- **Four modes** reachable from the mode button: Dig & Fight, Blob Hoops, Blob Kickoff (soccer)
+  and Blob Volley.
+- **Gadgets** — a second ability per brawler on a 14-second cooldown, aimed like a super:
+  Goo Trap (green), Void Wall (purple), Frost Trap (blue), Flash Beacon (yellow), and
+  **Midas Touch** (gold), which turns nearby blobs into gold statues for five seconds. A statue
+  cannot move or shoot.
+- **Aimed supers.** Every super lands where you point, and while your super is charged a ring
+  shows exactly where it will go before you spend it.
+- **Terrain that matters.** Tall grass and the inside of a building hide you — you can still
+  shoot out and can still be shot, you just can't be *seen*. Trees and crystals block shots.
+- **Water is a portal network.** Stand in a pool, press E, and you swim under the map and
+  surface at another pool. You are untouchable while under.
+- **Sports ball rules (all three sports).** Walk into a loose ball to carry it. Your normal
+  attack throws a **short lob** — it goes up, not across the court. Your **super throws it
+  long**, and that is how you score from range. Rivals carry and shoot too, and a carrier who
+  takes a hit may fumble.
+- **First to 6** in every sport, threes still worth 3 in Hoops. Getting splatted respawns you
+  after three seconds instead of ending the match.
+
 ## 6. Parties, friends and team sizes
 
 ### 6.1 Parties
