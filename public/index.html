@@ -958,6 +958,112 @@ function addGrass(x,z,r){
   return g;
 }
 /* water: dive in, travel under the map, surface at any other pool */
+/* Real court markings, painted into a texture. Everything below is in world
+   units with the court centred on 0,0 — the helpers convert to pixels, so the
+   numbers read like a groundskeeper's, not a canvas API's. */
+function drawCourt(kind,W,H){
+  const px=2048, py=Math.round(px*H/W), S=px/W;
+  const c=document.createElement("canvas"); c.width=px; c.height=py;
+  const g=c.getContext("2d");
+  const X=x=>(x+W/2)*S, Z=z=>(z+H/2)*S;
+  const rect=(x,z,w,h)=>{g.strokeRect(X(x-w/2),Z(z-h/2),w*S,h*S);};
+  const line=(x1,z1,x2,z2)=>{g.beginPath();g.moveTo(X(x1),Z(z1));g.lineTo(X(x2),Z(z2));g.stroke();};
+  const circle=(x,z,r,fill)=>{g.beginPath();g.arc(X(x),Z(z),r*S,0,TAU);fill?g.fill():g.stroke();};
+  const arc=(x,z,r,a0,a1)=>{g.beginPath();g.arc(X(x),Z(z),r*S,a0,a1);g.stroke();};
+
+  if(kind==="hoops"){
+    g.fillStyle="#B8763A"; g.fillRect(0,0,px,py);              // maple floor
+    for(let i=0;i<py;i+=6){                                     // grain
+      g.fillStyle="rgba(0,0,0,"+(0.02+Math.random()*0.035)+")";
+      g.fillRect(0,i,px,2+Math.random()*3);
+    }
+    g.fillStyle="rgba(255,255,255,.05)";
+    g.fillRect(X(-W/2+1),Z(-H/2+1),(W-2)*S,(H-2)*S);
+    g.strokeStyle="#FFFFFF"; g.lineWidth=Math.max(3,.22*S); g.lineJoin="round";
+    rect(0,0,W-2,H-2);                                          // boundary
+    line(0,-H/2+1,0,H/2+-1);                                    // halfway
+    circle(0,0,3.6);                                            // centre circle
+    [-1,1].forEach(sd=>{
+      const base=sd*(W/2-1), keyD=9.5, hoopX=sd*(W/2-1-2.6);
+      g.fillStyle="rgba(24,86,150,.55)";                        // painted key
+      g.fillRect(X(Math.min(base,base-sd*keyD)),Z(-4.9),keyD*S,9.8*S);
+      rect(base-sd*keyD/2,0,keyD,9.8);
+      circle(base-sd*keyD,0,3.6);                               // free-throw circle
+      // three-point line: two straights and the arc between them
+      const tpr=13.2, zEdge=Math.sqrt(Math.max(0,tpr*tpr-(W/2-1-2.6-(base-sd*1.5))**2));
+      line(base,-10.6,base-sd*4.2,-10.6);
+      line(base, 10.6,base-sd*4.2, 10.6);
+      const a=Math.asin(10.6/tpr);
+      if(sd>0) arc(hoopX,0,tpr,Math.PI/2+a,Math.PI*1.5-a);
+      else     arc(hoopX,0,tpr,-Math.PI/2+a,Math.PI/2-a);
+      arc(hoopX,0,2.2,0,TAU);                                   // restricted area
+    });
+  }
+
+  if(kind==="volley"){
+    g.fillStyle="#1F6FB2"; g.fillRect(0,0,px,py);               // blue surround
+    g.fillStyle="#E4863A";                                       // orange court
+    g.fillRect(X(-W/2+3),Z(-H/2+3),(W-6)*S,(H-6)*S);
+    g.strokeStyle="#FFFFFF"; g.lineWidth=Math.max(3,.24*S);
+    rect(0,0,W-6,H-6);                                           // boundary
+    line(0,-H/2+3,0,H/2-3);                                      // centre line
+    [-1,1].forEach(sd=>line(sd*6,-H/2+3,sd*6,H/2-3));            // attack lines
+  }
+
+  if(kind==="soccer"){
+    for(let i=0;i<12;i++){                                       // mown stripes
+      g.fillStyle=i%2?"#2E7D32":"#357F3B";
+      g.fillRect(i*px/12,0,px/12+1,py);
+    }
+    g.strokeStyle="rgba(255,255,255,.92)"; g.lineWidth=Math.max(3,.2*S);
+    rect(0,0,W-3,H-3);                                           // touchlines
+    line(0,-H/2+1.5,0,H/2-1.5);                                  // halfway
+    circle(0,0,6);                                               // centre circle
+    g.fillStyle="#FFFFFF"; circle(0,0,.35,true);                 // centre spot
+    [-1,1].forEach(sd=>{
+      const gl=sd*(W/2-1.5);
+      rect(gl-sd*8,0,16,24);                                     // penalty area
+      rect(gl-sd*3,0,6,12);                                      // goal area
+      circle(gl-sd*11,0,.35,true);                               // penalty spot
+      const a=Math.acos(8/9.15);                                 // penalty arc
+      if(sd>0) arc(gl-sd*11,0,9.15,Math.PI/2+a,Math.PI*1.5-a);
+      else     arc(gl-sd*11,0,9.15,-Math.PI/2+a,Math.PI/2-a);
+      [-1,1].forEach(cz=>arc(gl,cz*(H/2-1.5),1.5,0,TAU));        // corner arcs
+    });
+  }
+  const t=new THREE.CanvasTexture(c);
+  t.encoding=THREE.sRGBEncoding; t.anisotropy=8; return t;
+}
+function netTexture(cols,rows){
+  const c=document.createElement("canvas"); c.width=1024; c.height=256;
+  const g=c.getContext("2d");
+  g.clearRect(0,0,1024,256);
+  g.strokeStyle="rgba(255,255,255,.85)"; g.lineWidth=3;
+  for(let i=0;i<=cols;i++){ const x=i*1024/cols; g.beginPath();g.moveTo(x,0);g.lineTo(x,256);g.stroke(); }
+  for(let j=0;j<=rows;j++){ const y=j*256/rows; g.beginPath();g.moveTo(0,y);g.lineTo(1024,y);g.stroke(); }
+  const t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; return t;
+}
+function addCourt(kind,W,H){
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(W,H),
+    new THREE.MeshStandardMaterial({map:drawCourt(kind,W,H),roughness:kind==="hoops"?.45:.95,
+      metalness:0,envMapIntensity:kind==="hoops"?.35:.1}));
+  m.rotation.x=-Math.PI/2; m.position.y=.03; m.receiveShadow=true; m.userData.own=1;
+  world.add(m); return m;
+}
+/* the pad you come back on */
+function addRespawnPad(){
+  const g=new THREE.Group();
+  const pad=new THREE.Mesh(new THREE.CircleGeometry(2.6,40),
+    new THREE.MeshBasicMaterial({color:C(B().color),transparent:true,opacity:.22,
+      side:THREE.DoubleSide,depthWrite:false}));
+  pad.rotation.x=-Math.PI/2; g.add(pad);
+  const rim=new THREE.Mesh(new THREE.RingGeometry(2.5,2.9,44),
+    new THREE.MeshBasicMaterial({color:C(B().color),transparent:true,opacity:.6,
+      side:THREE.DoubleSide,depthWrite:false}));
+  rim.rotation.x=-Math.PI/2; g.add(rim);
+  g.position.set(0,.06,0); g.userData.own=1; world.add(g);
+  H.pad=g; return g;
+}
 function addWaterPool(x,z,r){
   const w=new THREE.Mesh(new THREE.CircleGeometry(r,36),
     new THREE.MeshStandardMaterial({color:C(0x1E6F8C),roughness:.12,metalness:.35,
@@ -1174,7 +1280,7 @@ function hurtPlayer(dmg){
   if(P.hp<=0){ P.hp=0; P.alive=false; world.remove(P.blob.group);
     burst(P.pos,30,11,B().color,1,2); splat(P.pos,B().color);
     if(SPORT[G.mode]){ if(H.held&&H.heldBy==="p")dropBall();
-      H.respawn=3; toast("Splatted — back in 3s","#F87171"); }
+      H.respawn=3; toast("Splatted — back in the middle in 3s","#F87171"); }
     else endMatch(false); }
 }
 const splats=[];
@@ -1637,18 +1743,21 @@ function drawMini(){
    BLOB HOOPS — the hoop rides a rail across the back line and slides
    ========================================================================= */
 const SPORT={
-  hoops: {ball:"basketball", goal:"hoop",  n:"Blob Hoops"},
-  soccer:{ball:"football",   goal:"net",   n:"Blob Kickoff"},
-  volley:{ball:"volleyball", goal:"floor", n:"Blob Volley"}
+  hoops: {ball:"basketball", goal:"hoop",  n:"Blob Hoops",    target:6, w:54, h:30},
+  soccer:{ball:"football",   goal:"net",   n:"Blob Kickoff",  target:2, w:56, h:36},
+  volley:{ball:"volleyball", goal:"floor", n:"Blob Volley",   target:3, w:44, h:24}
 };
+const TARGET=()=>(SPORT[G.mode]||SPORT.hoops).target;
 const H={ball:null,vel:new THREE.Vector3(),hoops:[],speed:5,base:5,
   score:0,rival:0,time:180,lastShotFrom:null,lastThrower:null,
   held:false,heldBy:null,cool:0,respawn:0};
-const WIN_SCORE=6;
+
 function buildSport(mode){
   clearWorld(); crates=[]; bushes=[]; mounds=[]; bots=[]; walls3.length=0;
   waters=[]; buildings=[]; traps.length=0;
-  addGround(76,"#12231A"); addWalls(66,3.0,0x1B3629);
+  const CW=SPORT[mode].w, CH=SPORT[mode].h;
+  addGround(86,mode==="soccer"?"#16341C":"#101C16"); addWalls(72,3.0,0x1B3629);
+  addCourt(mode,CW,CH);
   H.hoops=[]; H.goals=[]; H.net=null; H.speed=H.base; H.score=0; H.rival=0; H.time=180;
   H.held=false; H.heldBy=null; H.cool=0; H.respawn=0; H.lastThrower=null; H.sport=mode;
 
@@ -1661,11 +1770,7 @@ function buildSport(mode){
 
   if(mode==="hoops"){
     [[-26,"#4ADE3C",1],[26,"#A855F7",-1]].forEach(([x,col,face],i)=>{
-      const arc=new THREE.Mesh(new THREE.RingGeometry(19.4,19.9,48,1,
-          face>0?Math.PI*.5:-Math.PI*.5,Math.PI),
-        new THREE.MeshBasicMaterial({color:C(col),transparent:true,opacity:.3,side:THREE.DoubleSide}));
-      arc.rotation.x=-Math.PI/2; arc.position.set(x,.06,0); arc.userData.own=1; world.add(arc);
-      const rail=new THREE.Mesh(new THREE.BoxGeometry(.4,.4,30),
+        const rail=new THREE.Mesh(new THREE.BoxGeometry(.4,.4,18),
         new THREE.MeshStandardMaterial({color:C(0x8FA79A),metalness:.9,roughness:.3,envMapIntensity:2}));
       rail.position.set(x+face*-2,7.4,0); rail.userData.own=1; world.add(rail);
       const hoop=new THREE.Group();
@@ -1673,11 +1778,18 @@ function buildSport(mode){
         new THREE.MeshStandardMaterial({color:C(col),metalness:1,roughness:.22,
           emissive:C(col).multiplyScalar(.25),envMapIntensity:2.6}));
       ring2.rotation.x=Math.PI/2; hoop.add(ring2);
-      const board=new THREE.Mesh(new THREE.BoxGeometry(.3,3.4,4.6),
-        new THREE.MeshStandardMaterial({color:C(0xE9F4EC),transparent:true,opacity:.26,roughness:.1,metalness:.1}));
-      board.position.set(face*-2.1,1.5,0); hoop.add(board);
+      const net=new THREE.Mesh(new THREE.CylinderGeometry(1.9,1.15,1.7,14,3,true),
+        new THREE.MeshBasicMaterial({color:0xFFFFFF,wireframe:true,transparent:true,opacity:.55}));
+      net.position.y=-.85; hoop.add(net);
+      const board=new THREE.Mesh(new THREE.BoxGeometry(.22,3.5,5.4),
+        new THREE.MeshStandardMaterial({color:C(0xF2FBF5),transparent:true,opacity:.34,
+          roughness:.08,metalness:.1}));
+      board.position.set(face*-2.2,1.6,0); hoop.add(board);
+      const sq=new THREE.Mesh(new THREE.BoxGeometry(.26,1.2,1.9),
+        new THREE.MeshBasicMaterial({color:C(0xE24B26)}));           // the shooter's square
+      sq.position.set(face*-2.18,.95,0); hoop.add(sq);
       hoop.position.set(x,6,0); hoop.userData.own=1; world.add(hoop);
-      H.hoops.push({g:hoop,x,rail:i?7:-7,dir:i?-1:1,speed:H.base,pause:0,owner:i?"b":"p",col});
+      H.hoops.push({g:hoop,x,rail:i?4:-4,dir:i?-1:1,speed:H.base,pause:0,owner:i?"b":"p",col,span:8});
     });
   }
   if(mode==="soccer"){
@@ -1690,24 +1802,30 @@ function buildSport(mode){
       post(-5); post(5);
       const bar=new THREE.Mesh(new THREE.CylinderGeometry(.22,.22,10,10),barM);
       bar.rotation.x=Math.PI/2; bar.position.set(0,5,0); g.add(bar);
-      const netM=new THREE.Mesh(new THREE.BoxGeometry(2.6,5,10),
-        new THREE.MeshBasicMaterial({color:C(col),transparent:true,opacity:.16,depthWrite:false}));
-      netM.position.set(Math.sign(x)*1.3,2.5,0); g.add(netM);
+      const netM=new THREE.Mesh(new THREE.BoxGeometry(2.8,5,10),
+        new THREE.MeshBasicMaterial({color:0xFFFFFF,wireframe:true,transparent:true,opacity:.42}));
+      netM.position.set(Math.sign(x)*1.4,2.5,0); g.add(netM);
+      const back=new THREE.Mesh(new THREE.BoxGeometry(.2,5,10),
+        new THREE.MeshBasicMaterial({color:C(col),transparent:true,opacity:.13,depthWrite:false}));
+      back.position.set(Math.sign(x)*2.8,2.5,0); g.add(back);
       g.position.set(x,0,0); g.userData.own=1; world.add(g);
       H.goals.push({g,x,owner:own,col});
       zone(x,col,own);
     });
   }
   if(mode==="volley"){
-    const net=new THREE.Mesh(new THREE.BoxGeometry(.4,4.2,34),
-      new THREE.MeshStandardMaterial({color:C(0xE9F4EC),transparent:true,opacity:.3,roughness:.4}));
-    net.position.set(0,2.1,0); net.castShadow=true; net.userData.own=1; world.add(net);
-    H.net=net;
-    [[-16,"#A855F7"],[16,"#4ADE3C"]].forEach(([x,col])=>{
-      const f=new THREE.Mesh(new THREE.PlaneGeometry(28,40),
-        new THREE.MeshBasicMaterial({color:C(col),transparent:true,opacity:.10,side:THREE.DoubleSide}));
-      f.rotation.x=-Math.PI/2; f.position.set(x,.04,0); f.userData.own=1; world.add(f);
-    });
+    const mesh=new THREE.Mesh(new THREE.PlaneGeometry(18,2.7),
+      new THREE.MeshBasicMaterial({map:netTexture(34,6),transparent:true,opacity:.92,
+        side:THREE.DoubleSide,depthWrite:false}));
+    mesh.rotation.y=Math.PI/2; mesh.position.set(0,2.9,0); mesh.userData.own=1; world.add(mesh);
+    const tape=new THREE.Mesh(new THREE.BoxGeometry(.32,.4,18),
+      new THREE.MeshStandardMaterial({color:C(0xFFFFFF),roughness:.6}));
+    tape.position.set(0,4.32,0); tape.castShadow=true; tape.userData.own=1; world.add(tape);
+    const postM=new THREE.MeshStandardMaterial({color:C(0x8FA79A),metalness:.85,roughness:.3,
+      envMapIntensity:2});
+    [-9.2,9.2].forEach(pz=>{ const po=new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,4.9,12),postM);
+      po.position.set(0,2.45,pz); po.castShadow=true; po.userData.own=1; world.add(po); });
+    H.net=tape;
   }
 
   const ball=new THREE.Mesh(new THREE.SphereGeometry(.85,20,16),
@@ -1716,11 +1834,11 @@ function buildSport(mode){
   ball.castShadow=true; ball.position.set(0,1.2,0); world.add(ball);
   H.ball=ball; H.vel.set(0,0,0);
 
-  P.pos.set(12,1,0); P.hp=P.max=hpOf(B()); P.ammo=3; P.at=0; P.at2=0; P.sup=0; P.dash=0;
+  P.pos.set(mode==="volley"?14:16,1,0); P.hp=P.max=hpOf(B()); P.ammo=3; P.at=0; P.at2=0; P.sup=0; P.dash=0;
   P.gad=0; P.swim=0; P.submerged=false; P.alive=true;
   if(P.blob)world.remove(P.blob.group);
   P.blob=makeBlob(B().color,SK().v,1.15); world.add(P.blob.group);
-  addPlayerRing(); addSuperPreview();
+  addPlayerRing(); addSuperPreview(); addRespawnPad();
   const pal=["#A855F7","#3B82F6"].filter(c=>c!==B().color);
   addBot(new THREE.Vector3(-8,1,10),pal[0],"classic");
   addBot(new THREE.Vector3(-8,1,-10),pal[1]||"#EF4444","void");
@@ -1763,13 +1881,19 @@ function updateSport(dt){
   updatePlayer(dt); updateBots(dt); updateBullets(dt);
   // respawn
   if(H.respawn>0){ H.respawn-=dt;
-    if(H.respawn<=0){ P.alive=true; P.hp=P.max; P.ammo=3; P.pos.set(14,1,0);
-      P.vel.set(0,0,0); world.add(P.blob.group); toast("Back in!",B().color); } }
+    if(H.respawn<=0){ P.alive=true; P.hp=P.max; P.ammo=3; P.pos.set(0,1,0);
+      P.vel.set(0,0,0); world.add(P.blob.group);
+      burst(new THREE.Vector3(0,1,0),26,8,B().color,.8,1.8); ring(new THREE.Vector3(0,0,0),B().color,6,.5);
+      toast("Back in!",B().color); } }
+  if(H.pad){ const on=H.respawn>0;
+    H.pad.children[1].material.opacity=on?(.5+Math.sin(G.t*7)*.35):.35;
+    H.pad.children[0].material.opacity=on?.34:.16; }
   // both hoops slide along their back line; each pauses after it is scored in
   H.hoops.forEach(h=>{
     if(h.pause>0){ h.pause-=dt; }
-    else { h.rail+=h.dir*h.speed*dt;
-      if(h.rail>14){h.rail=14;h.dir=-1;} if(h.rail<-14){h.rail=-14;h.dir=1;} }
+    else { const sp=h.span||8;
+      h.rail+=h.dir*h.speed*dt;
+      if(h.rail>sp){h.rail=sp;h.dir=-1;} if(h.rail<-sp){h.rail=-sp;h.dir=1;} }
     h.g.position.z=h.rail; h.g.children[0].rotation.z+=dt*.6;
   });
   if(H.cool>0)H.cool-=dt;
@@ -1811,7 +1935,7 @@ function award(mine,pts,at,col){
   burst(at.clone(),34,11,col||"#F5B60D",.9,2);
   ring(new THREE.Vector3(at.x,.1,at.z),col||"#F5B60D",7,.6);
   resetBall();
-  if(H.score>=WIN_SCORE||H.rival>=WIN_SCORE) endMatch(H.score>=WIN_SCORE);
+  if(H.score>=TARGET()||H.rival>=TARGET()) endMatch(H.score>=TARGET());
 }
 function scoreCheck(){
   const b=H.ball;
@@ -2014,7 +2138,7 @@ function frame(now){
       $("modeMain").innerHTML='<span style="color:'+B().color+'">'+H.score+
         '</span> — <span style="color:#F87171">'+H.rival+'</span>';
       $("modeSub").innerHTML=MODE(G.mode).n.toUpperCase()+' · <span style="color:'+DF().col+'">'
-        +DF().n.toUpperCase()+'</span> · TO '+WIN_SCORE+' · '+Math.max(0,Math.ceil(H.time))+"s"
+        +DF().n.toUpperCase()+'</span> · TO '+TARGET()+' · '+Math.max(0,Math.ceil(H.time))+"s"
         +(H.held?(H.heldBy==="p"?" · YOU HAVE THE BALL":" · THEY HAVE THE BALL"):"");
       if(H.time<=0)endMatch(H.score>H.rival);
     } else {

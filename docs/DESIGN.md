@@ -175,9 +175,19 @@ Team modes, symmetric teams (see §6), 2:30–3:00 rounds.
 
 | Mode | Field | How you score | The twist |
 |---|---|---|---|
-| **Blob Kickoff** | Open pitch, a net at each end | Shoot the goo ball into their net | The ball **charges** as it's hit — 5+ hits and it glows, and a charged ball splats the first defender it touches. First to 3, or lead at 3:00 |
+| **Blob Kickoff** | Marked pitch, a goal at each end | Carry it, then shoot it into their net. **First to 2** | The ball **charges** as it's hit — 5+ hits and it glows, and a charged ball splats the first defender it touches. First to 3, or lead at 3:00 |
+**The courts are real courts.** Each sport plays on properly marked ground, painted into a
+texture at build time: the basketball court has a maple floor with grain, painted keys,
+free-throw circles, three-point arcs with their corner straights, and backboards with the
+shooter's square; the pitch has mown stripes, penalty and goal areas, penalty spots and arcs,
+a centre circle and corner arcs; the volleyball court has the orange-on-blue surround, attack
+lines, a net with a white tape along the top, and posts. Nets are real geometry, not decals.
+
+**Every sport respawns you.** Getting splatted drops the ball and puts you back on a glowing
+pad at the centre circle after three seconds. The match keeps going.
+
 | **Blob Hoops** | Court with one hoop at each end, mounted on a rail | Carry the ball, then shoot it through the hoop | **The hoop will not hold still** — it slides side to side along the back line, and it gets faster every time you score. See §5.4. **First to 6** |
-| **Blob Volley** | Two halves split by a goo net | Ball touches their floor | **Max 3 team touches** per side, and a **Super is a spike** — heavy, fast, hard to return. Rally scoring, first to 5 |
+| **Blob Volley** | Marked court, net down the middle | Land the ball on their floor **3 times** | **Max 3 team touches** per side, and a **Super is a spike** — heavy, fast, hard to return. Rally scoring, first to 5 |
 | **Blob Puck** | Low-friction goo-ice rink | Shoot the puck into their net | **Everything slides** — puck and players. Dash is a legal body check with a 1s stun. First to 3, or lead at 3:00 |
 
 ### 5.4 Blob Hoops — the moving hoop
@@ -190,8 +200,8 @@ twice.**
   don't know where it'll be.
 - It **slides side to side** at a base 6 studs/second, reversing when it reaches either end of
   the rail. Smooth and constant, so it can be led like any moving target.
-- **Scoring:** 2 points from inside the arc, **3 from beyond it**. **First team to 6 wins**,
-  or whoever leads when time runs out.
+- **Scoring:** 2 points from inside the arc, **3 from beyond it**. **Each sport has its own target**: Hoops is first to 6, Kickoff first to 2, Volley first to 3.
+  Whoever leads when time runs out takes it.
 - **You carry, then shoot.** Walk into a loose ball to pick it up; it rides in front of you and
   your shoot button throws it. The throw's *power* is worked out from how far the hoop is — you
   only control the direction. But the hoop keeps sliding while the ball is in the air, so a

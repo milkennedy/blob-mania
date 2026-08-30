@@ -35,8 +35,9 @@ menu and it opens full-screen with its own icon, no browser bars.
   aims where you're going.
 - **Levels** — each brawler levels 1–10 by being played (damage, splats, goals, digs, wins), and
   each level is +5% health and +5% damage on that brawler. Levels are earned, never bought.
-- **Two modes** — Last Blob Standing, and Blob Hoops where the hoop rides a rail across the back
-  line and speeds up every time you score.
+- **Four modes** — Dig & Fight, and three sports on real marked courts: Blob Hoops (first to 6,
+  with a hoop that slides along the back line), Blob Kickoff (first to 2) and Blob Volley (first
+  to 3). Dying in a sport respawns you at the centre circle after three seconds.
 
 **The rule the whole game rests on:** a skin changes how you look and how your shot lands. It
 never changes damage. The code enforces it — damage functions never receive a skin.
