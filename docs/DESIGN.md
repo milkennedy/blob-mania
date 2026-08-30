@@ -187,7 +187,19 @@ lines, a net with a white tape along the top, and posts. Nets are real geometry,
 pad at the centre circle after three seconds. The match keeps going.
 
 | **Blob Hoops** | Court with one hoop at each end, mounted on a rail | Carry the ball, then shoot it through the hoop | **The hoop will not hold still** — it slides side to side along the back line, and it gets faster every time you score. See §5.4. **First to 6** |
-| **Blob Volley** | Marked court, net down the middle | Land the ball on their floor **3 times** | **Max 3 team touches** per side, and a **Super is a spike** — heavy, fast, hard to return. Rally scoring, first to 5 |
+| **Blob Volley** | Marked court, net down the middle | Land the ball on their floor **3 times** |
+
+### Blob Volley is a rally, not a carry game
+
+The ball is never held. It arcs over the net toward a spot on the receiving side and **a ring
+lights up there**. Be standing inside that ring when it lands and the ball **bounces off you**
+and flies back over to a fresh spot on the other side; the rivals then have to do the same.
+Miss it and it hits the floor — a point to the other side, and the rally resets.
+
+**Every successful return makes the next one 0.2 faster.** The flight time falls 2.2s → 1.8 →
+1.6 → 1.4 → 1.2 → 1.0, capped at ×2.6, so a long rally turns frantic and ends itself. And all
+of it happens while both sides are still shooting at each other, so knocking a rival away from
+their ring is a legitimate way to win the point. **Max 3 team touches** per side, and a **Super is a spike** — heavy, fast, hard to return. Rally scoring, first to 5 |
 | **Blob Puck** | Low-friction goo-ice rink | Shoot the puck into their net | **Everything slides** — puck and players. Dash is a legal body check with a 1s stun. First to 3, or lead at 3:00 |
 
 ### 5.4 Blob Hoops — the moving hoop

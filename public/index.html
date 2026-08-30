@@ -1484,7 +1484,23 @@ function rivalTarget(){
   if(G.mode==="soccer"){ const g=H.goals.find(x=>x.owner==="b"); return new THREE.Vector3(g.x,0,0); }
   return new THREE.Vector3(16,0,(Math.random()-.5)*20);   // volley: onto the player's floor
 }
+function volleyAI(bt,dt){
+  if(!RALLY.live)return false;
+  if(RALLY.side!=="b")return false;               // not their ball, go fight
+  // the nearest rival runs for the ring
+  const near=bots.filter(o=>o.alive).sort((a,c)=>
+    Math.hypot(a.pos.x-RALLY.to.x,a.pos.z-RALLY.to.z)-
+    Math.hypot(c.pos.x-RALLY.to.x,c.pos.z-RALLY.to.z))[0];
+  if(near!==bt)return false;
+  const to=new THREE.Vector3(RALLY.to.x-bt.pos.x,0,RALLY.to.z-bt.pos.z);
+  const d=to.length(); bt.aim.copy(to.clone().normalize());
+  const rush=d>CATCH_R*.5?8.2*DF().spd:0;
+  bt.vel.x=lerp(bt.vel.x,bt.aim.x*rush,.16);
+  bt.vel.z=lerp(bt.vel.z,bt.aim.z*rush,.16);
+  return true;
+}
 function hoopsAI(bt,dt){
+  if(G.mode==="volley") return volleyAI(bt,dt);
   const tp=rivalTarget();
   if(H.held&&H.heldBy===bt){                     // carrying: drive at their goal, then shoot
     const to=new THREE.Vector3(tp.x-bt.pos.x,0,tp.z-bt.pos.z);
@@ -1760,6 +1776,7 @@ function buildSport(mode){
   addCourt(mode,CW,CH);
   H.hoops=[]; H.goals=[]; H.net=null; H.speed=H.base; H.score=0; H.rival=0; H.time=180;
   H.held=false; H.heldBy=null; H.cool=0; H.respawn=0; H.lastThrower=null; H.sport=mode;
+  H.served=0; RALLY.live=false; RALLY.mul=1; RALLY.ring=null;
 
   // the green zone: your scoring area, painted on the floor
   const zone=(x,col,own)=>{
@@ -1825,7 +1842,7 @@ function buildSport(mode){
       envMapIntensity:2});
     [-9.2,9.2].forEach(pz=>{ const po=new THREE.Mesh(new THREE.CylinderGeometry(.18,.18,4.9,12),postM);
       po.position.set(0,2.45,pz); po.castShadow=true; po.userData.own=1; world.add(po); });
-    H.net=tape;
+    H.net=tape; addRallyRing();
   }
 
   const ball=new THREE.Mesh(new THREE.SphereGeometry(.85,20,16),
@@ -1844,6 +1861,91 @@ function buildSport(mode){
   addBot(new THREE.Vector3(-8,1,-10),pal[1]||"#EF4444","void");
   bots.forEach(b=>{ b.hp=b.max=Math.round(260*DF().hp); b.carry=false; });
   G.kills=0; G.gold0=save.gold; G.xpRun=0;
+}
+/* ============ VOLLEYBALL IS A RALLY ============
+   The ball arcs to a spot on the receiving side and a ring lights up there.
+   Be standing in it and the ball bounces off you and goes back over. Miss it
+   and it hits the floor — a point to the other side. Every successful return
+   makes the next one 0.2 faster, so a long rally turns frantic. All the while
+   you are still shooting at each other. */
+const RALLY={to:new THREE.Vector3(),from:new THREE.Vector3(),t:0,dur:2.2,mul:1,
+  side:"p",live:false,ring:null};
+const RALLY_BASE=2.2, RALLY_STEP=.2, RALLY_MAXMUL=2.6, CATCH_R=3.4, APEX=7;
+function addRallyRing(){
+  const g=new THREE.Group();
+  const disc=new THREE.Mesh(new THREE.CircleGeometry(CATCH_R,40),
+    new THREE.MeshBasicMaterial({color:0xFFFFFF,transparent:true,opacity:.16,
+      side:THREE.DoubleSide,depthWrite:false}));
+  disc.rotation.x=-Math.PI/2; g.add(disc);
+  const rim=new THREE.Mesh(new THREE.RingGeometry(CATCH_R-.36,CATCH_R,48),
+    new THREE.MeshBasicMaterial({color:0xFFFFFF,transparent:true,opacity:.9,
+      side:THREE.DoubleSide,depthWrite:false}));
+  rim.rotation.x=-Math.PI/2; g.add(rim);
+  g.position.y=.09; g.visible=false; g.userData.own=1; world.add(g);
+  RALLY.ring=g; return g;
+}
+function rallyServe(side,keepSpeed){
+  RALLY.side=side; RALLY.live=true; RALLY.t=0;
+  if(!keepSpeed) RALLY.mul=1;
+  RALLY.dur=RALLY_BASE/RALLY.mul;
+  const sgn=side==="p"?1:-1;
+  RALLY.to.set(sgn*(4+Math.random()*14),1,(Math.random()-.5)*13);
+  RALLY.from.copy(H.ball.position);
+  if(RALLY.ring){
+    RALLY.ring.visible=true;
+    RALLY.ring.position.set(RALLY.to.x,.09,RALLY.to.z);
+    const col=C(side==="p"?B().color:0xF87171);
+    RALLY.ring.children[0].material.color.copy(col);
+    RALLY.ring.children[1].material.color.copy(col);
+  }
+}
+function rallyPoint(mine){
+  RALLY.live=false; if(RALLY.ring)RALLY.ring.visible=false;
+  const at=RALLY.to.clone().setY(.2);
+  burst(at,26,8,mine?"#4ADE3C":"#F87171",.8,1.8);
+  ring(at,mine?"#4ADE3C":"#F87171",7,.55);
+  if(mine){ H.score++; save.gold+=8; addXP(20*DF().reward); persist(); hudGold();
+    toast("Point! "+H.score+" — "+H.rival,"#4ADE3C"); }
+  else { H.rival++; toast("They score. "+H.score+" — "+H.rival,"#F87171"); }
+  if(H.score>=TARGET()||H.rival>=TARGET()){ endMatch(H.score>=TARGET()); return; }
+  H.ball.position.set(0,4,0); H.vel.set(0,0,0);
+  setTimeout(()=>{ if(G.running&&G.mode==="volley") rallyServe(mine?"b":"p",false); },900);
+}
+function stepRally(dt){
+  if(!RALLY.live)return;
+  RALLY.t+=dt;
+  const k=Math.min(1,RALLY.t/RALLY.dur);
+  H.ball.position.set(
+    lerp(RALLY.from.x,RALLY.to.x,k),
+    lerp(1.1,1,k)+Math.sin(k*Math.PI)*APEX,
+    lerp(RALLY.from.z,RALLY.to.z,k));
+  H.ball.rotation.x+=dt*4; H.ball.rotation.z+=dt*3;
+  if(RALLY.ring){                                  // the ring tightens as it comes down
+    const pulse=.55+.45*Math.sin(G.t*8);
+    RALLY.ring.children[1].material.opacity=.45+.5*k*pulse;
+    RALLY.ring.children[0].material.opacity=.10+.22*k;
+    RALLY.ring.scale.setScalar(1+(1-k)*.25);
+  }
+  if(k>=1){
+    const at=RALLY.to;
+    let receiver=null;
+    if(RALLY.side==="p"){
+      if(P.alive&&Math.hypot(P.pos.x-at.x,P.pos.z-at.z)<CATCH_R) receiver="p";
+    } else {
+      const b=bots.find(o=>o.alive&&Math.hypot(o.pos.x-at.x,o.pos.z-at.z)<CATCH_R);
+      if(b) receiver=b;
+    }
+    if(receiver){
+      RALLY.mul=Math.min(RALLY_MAXMUL,RALLY.mul+RALLY_STEP);
+      const who=receiver==="p"?P.pos:receiver.pos;
+      burst(who.clone().setY(1.6),18,7,receiver==="p"?B().color:"#F87171",.5,1.4);
+      toast(receiver==="p"?"Bump! ×"+RALLY.mul.toFixed(1):"They return it","#E9F4EC");
+      H.ball.position.copy(who).setY(1.8);
+      rallyServe(RALLY.side==="p"?"b":"p",true);
+    } else {
+      rallyPoint(RALLY.side!=="p");     // it hit their floor if it was headed their way
+    }
+  }
 }
 function resetBall(){ H.ball.position.set(0,1.4,0); H.vel.set(0,0,0);
   H.held=false; H.heldBy=null; H.cool=.6; bots.forEach(b=>b.carry=false); }
@@ -1897,6 +1999,12 @@ function updateSport(dt){
     h.g.position.z=h.rail; h.g.children[0].rotation.z+=dt*.6;
   });
   if(H.cool>0)H.cool-=dt;
+  if(G.mode==="volley"){                 // volley is a rally, not a carry game
+    stepRally(dt);
+    if(!RALLY.live&&!H.served){ H.served=1; setTimeout(()=>{ if(G.running&&G.mode==="volley")
+      rallyServe(Math.random()<.5?"p":"b",false); },700); }
+    return;
+  }
   const b=H.ball;
   // carried? the ball rides in front of whoever has it
   if(H.held){
@@ -1948,13 +2056,7 @@ function scoreCheck(){
     }
     return;
   }
-  if(G.mode==="volley"){
-    if(b.position.y<1.05 && Math.abs(b.position.x)>1.5){
-      const mine=b.position.x<0;                 // it landed on their half
-      award(mine,1,b.position,mine?"#4ADE3C":"#F87171"); return;
-    }
-    return;
-  }
+  if(G.mode==="volley") return;              // the rally handles its own scoring
   if(H.vel.y<0) for(const h of H.hoops){
     const hp=h.g.position;
     if(Math.abs(b.position.y-hp.y)<.95 && Math.hypot(b.position.x-hp.x,b.position.z-hp.z)<1.95){
