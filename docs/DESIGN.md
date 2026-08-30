@@ -249,6 +249,12 @@ The playable build (`public/index.html`) implements this slice:
   cannot move or shoot.
 - **Aimed supers.** Every super lands where you point, and while your super is charged a ring
   shows exactly where it will go before you spend it.
+- **The harpoon.** Right-click, `F`, or the HARPOON button fires a spear on a rope, on a 7-second
+  cooldown, and it does three different things depending on what it sticks into: a **blob** takes
+  40 damage and gets reeled to you; a **tree, crate or crystal** reels *you* to it, so it doubles
+  as a grapple for crossing ground fast; and in the sports it **drags the ball back to you**. A
+  spear tip rides the end of your aim line whenever it's loaded, so you can see the shot before
+  you take it. Whatever it meets first wins — a tree in the way will eat a shot meant for a blob.
 - **Terrain that matters.** Tall grass and the inside of a building hide you — you can still
   shoot out and can still be shot, you just can't be *seen*. Trees and crystals block shots.
 - **Water is a portal network.** Stand in a pool, press E, and you swim under the map and

@@ -48,6 +48,7 @@
   .lbl{font-size:9.5px;letter-spacing:.14em;color:var(--muted);text-transform:uppercase}
   #supBar > i{background:var(--gold);width:0}
   #gadBar > i{background:var(--blue);width:100%}
+  #harpBar > i{background:#CFE9DC;width:100%}
   #dash{font-size:10.5px;margin-top:9px;color:var(--green);font-weight:600;letter-spacing:.05em}
   #dash.cool{color:#4E6659}
   #goldBox{right:18px;bottom:18px;padding:10px 14px;color:var(--gold);font-weight:600;font-size:14px}
@@ -196,6 +197,8 @@
     <div id="dash">DASH READY · SHIFT</div>
     <div class="lbl" style="margin-top:9px" id="gadName">Gadget</div>
     <div class="bar" id="gadBar"><i></i></div>
+    <div class="lbl" style="margin-top:9px" id="harpName">Harpoon</div>
+    <div class="bar" id="harpBar"><i></i></div>
   </div>
   <div class="panel" id="modeBox"><div class="big" id="modeMain">4 blobs left</div><div class="sub" id="modeSub">LAST BLOB STANDING</div></div>
   <div class="panel" id="goldBox">◈ <span id="goldNum">0</span> gold</div>
@@ -203,12 +206,13 @@
   <div class="panel hidden" id="digBox"><div class="t" id="digTxt">HOLD E · DIG 1/3</div><div id="digRing"><i></i></div></div>
   <div id="toasts"></div>
   <div id="crosshair"></div>
-  <div id="hint">WASD move · mouse aim · click shoot · shift dash · space super · G gadget · E dig or dive · ESC menu</div>
+  <div id="hint">WASD move · mouse aim · click shoot · right-click or F harpoon · shift dash · space super · G gadget · E dig or dive · ESC menu</div>
   <div id="tbtns">
     <button class="tb" id="bDig" disabled>DIG</button>
     <button class="tb" id="bSuper" disabled>SUPER</button>
     <button class="tb" id="bDash">DASH</button>
     <button class="tb" id="bGad">GADGET</button>
+    <button class="tb" id="bHarp">HARPOON</button>
   </div>
 </div>
 <div id="rotate"><div class="ph"></div><p>Turn your phone sideways</p>
@@ -734,7 +738,7 @@ const G={mode:"arena",running:false,t:0,over:false,kills:0,gold0:0};
 let bots=[], crates=[], bushes=[], mounds=[], walls3=[];
 const P={pos:new THREE.Vector3(),vel:new THREE.Vector3(),aim:new THREE.Vector3(1,0,0),
   hp:500,max:500,ammo:3,at:0,at2:0,sup:0,dash:0,dashT:0,blob:null,hidden:false,alive:true,digs:0,
-  gad:0,swim:0,swimTo:null,submerged:false};
+  gad:0,swim:0,swimTo:null,submerged:false,harp:0};
 let curBlob=0, curSkin=0;
 const B=()=>BLOBS[curBlob], SK=()=>SKINS[B().id][curSkin];
 
@@ -747,12 +751,15 @@ addEventListener("keydown",e=>{
   if(k===" "){e.preventDefault(); useSuper();}
   if(k==="shift")doDash();
   if(k==="g")useGadget();
+  if(k==="f")fireHarpoon();
   if(k==="escape")toMenu();
 });
 addEventListener("keyup",e=>{keys[e.key.toLowerCase()]=false;});
 renderer.domElement.addEventListener("mousemove",e=>{mouse.x=e.clientX;mouse.y=e.clientY;
   const ch=document.getElementById("crosshair"); ch.style.left=e.clientX+"px"; ch.style.top=e.clientY+"px";});
-renderer.domElement.addEventListener("mousedown",e=>{e.preventDefault();mouse.down=true;});
+renderer.domElement.addEventListener("mousedown",e=>{e.preventDefault();
+  if(e.button===2){ fireHarpoon(); return; }        // right-click fires the harpoon
+  mouse.down=true;});
 addEventListener("mouseup",()=>{mouse.down=false;});
 renderer.domElement.addEventListener("contextmenu",e=>e.preventDefault());
 /* touch: left half is a move stick, right half is an AIM stick —
@@ -803,6 +810,7 @@ if(TOUCH){
   };
   hold($q("#bDash"),()=>doDash());
   hold($q("#bGad"),()=>useGadget());
+  hold($q("#bHarp"),()=>fireHarpoon());
   hold($q("#bSuper"),()=>useSuper());
   hold($q("#bDig"),()=>{touchDig=true;},()=>{touchDig=false;});
 }
@@ -950,6 +958,114 @@ function buildArena(){
   }
   G.kills=0; G.gold0=save.gold;
 }
+/* ============ THE HARPOON ============
+   A spear on a rope. Stick it in a blob and it reels them to you; stick it
+   in a tree or a wall and it reels YOU to it. In the sports it drags the
+   ball back. Cooldown 7s. */
+const HARP={state:"idle",mesh:null,rope:null,pos:new THREE.Vector3(),
+  dir:new THREE.Vector3(),t:0,target:null,anchor:new THREE.Vector3(),tip:null};
+const HARP_SPEED=62, HARP_RANGE=26;
+function makeSpear(){
+  const g=new THREE.Group();
+  const shaft=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,1.5,7),
+    new THREE.MeshStandardMaterial({color:C(0x8FA79A),metalness:.9,roughness:.3,envMapIntensity:2}));
+  shaft.rotation.x=Math.PI/2; g.add(shaft);
+  const head=new THREE.Mesh(new THREE.ConeGeometry(.26,.8,7),
+    new THREE.MeshStandardMaterial({color:C(0xE9F4EC),metalness:1,roughness:.15,envMapIntensity:2.4}));
+  head.rotation.x=Math.PI/2; head.position.z=1; g.add(head);
+  const barb=new THREE.Mesh(new THREE.ConeGeometry(.2,.42,6),
+    new THREE.MeshStandardMaterial({color:C(0xE9F4EC),metalness:1,roughness:.2}));
+  barb.rotation.x=-Math.PI/2; barb.position.z=.55; g.add(barb);
+  return g;
+}
+function fireHarpoon(){
+  if(P.harp>0||!P.alive||!G.running||HARP.state!=="idle")return;
+  P.harp=7;
+  HARP.mesh=makeSpear(); scene.add(HARP.mesh);
+  HARP.rope=new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(),new THREE.Vector3()]),
+    new THREE.LineBasicMaterial({color:C(0xCFE9DC),transparent:true,opacity:.85}));
+  scene.add(HARP.rope);
+  HARP.pos.copy(P.pos).setY(1.2).addScaledVector(P.aim,1.4);
+  HARP.dir.copy(P.aim); HARP.t=0; HARP.target=null; HARP.state="flying";
+  burst(HARP.pos.clone(),8,4,"#CFE9DC",.3,1);
+}
+function endHarpoon(){
+  if(HARP.mesh){ scene.remove(HARP.mesh); HARP.mesh=null; }
+  if(HARP.rope){ scene.remove(HARP.rope); HARP.rope.geometry.dispose();
+    HARP.rope.material.dispose(); HARP.rope=null; }
+  HARP.state="idle"; HARP.target=null;
+}
+function stepHarpoon(dt){
+  if(HARP.state==="idle")return;
+  HARP.t+=dt;
+  const from=P.pos.clone().setY(1.2);
+  if(HARP.state==="flying"){
+    HARP.pos.addScaledVector(HARP.dir,HARP_SPEED*dt);
+    // a blob? reel them in
+    for(const b of bots){
+      if(b.alive&&HARP.pos.distanceTo(b.pos)<1.7){
+        HARP.target=b; HARP.state="reelTarget"; damageBot(b,40);
+        burst(HARP.pos.clone(),14,6,"#CFE9DC",.5,1.3); toast("Hooked!","#CFE9DC"); break;
+      }
+    }
+    // the ball? drag it back
+    if(HARP.state==="flying"&&SPORT[G.mode]&&!H.held&&H.cool<=0&&
+       HARP.pos.distanceTo(H.ball.position)<1.8){
+      HARP.state="reelBall"; burst(HARP.pos.clone(),12,5,"#F5B60D",.5,1.3); toast("Hooked the ball!","#F5B60D");
+    }
+    // a tree, crate or crystal? pull yourself to it
+    if(HARP.state==="flying") for(const c of crates){
+      if(HARP.pos.distanceTo(c.pos)<c.r+.5){
+        HARP.anchor.copy(HARP.pos); HARP.state="pullSelf";
+        burst(HARP.pos.clone(),12,5,"#8FA79A",.45,1.2); break;
+      }
+    }
+    if(HARP.state==="flying"&&(HARP.t*HARP_SPEED>HARP_RANGE||
+       Math.abs(HARP.pos.x)>39||Math.abs(HARP.pos.z)>39)) HARP.state="retract";
+  }
+  else if(HARP.state==="reelTarget"){
+    const b=HARP.target;
+    if(!b||!b.alive){ HARP.state="retract"; }
+    else{
+      const to=from.clone().sub(b.pos).setY(0), d=to.length();
+      to.normalize(); b.pos.addScaledVector(to,Math.min(d,30*dt));
+      b.vel.multiplyScalar(.6);
+      HARP.pos.copy(b.pos).setY(1.2);
+      if(d<3.2||HARP.t>2) HARP.state="retract";
+    }
+  }
+  else if(HARP.state==="reelBall"){
+    const to=from.clone().sub(H.ball.position).setY(0), d=to.length();
+    to.normalize();
+    H.ball.position.addScaledVector(to,Math.min(d,34*dt));
+    H.ball.position.y=1.2; H.vel.set(0,0,0);
+    HARP.pos.copy(H.ball.position);
+    if(d<2.4||HARP.t>2){ HARP.state="retract"; H.cool=0; }
+  }
+  else if(HARP.state==="pullSelf"){
+    const to=HARP.anchor.clone().sub(P.pos).setY(0), d=to.length();
+    to.normalize();
+    P.pos.addScaledVector(to,Math.min(d-2.2,34*dt));
+    P.vel.multiplyScalar(.5);
+    if(d<3||HARP.t>2) HARP.state="retract";
+  }
+  else if(HARP.state==="retract"){
+    const to=from.clone().sub(HARP.pos), d=to.length();
+    HARP.pos.addScaledVector(to.normalize(),Math.min(d,70*dt));
+    if(d<1.5){ endHarpoon(); return; }
+  }
+  if(HARP.mesh){
+    HARP.mesh.position.copy(HARP.pos);
+    HARP.mesh.lookAt(HARP.pos.clone().add(HARP.state==="flying"?HARP.dir:from.clone().sub(HARP.pos)));
+  }
+  if(HARP.rope){
+    const pts=HARP.rope.geometry.attributes.position;
+    pts.setXYZ(0,from.x,from.y,from.z);
+    pts.setXYZ(1,HARP.pos.x,HARP.pos.y,HARP.pos.z);
+    pts.needsUpdate=true;
+  }
+}
 let playerRing=null, aimLine=null, superPrev=null;
 function addSuperPreview(){
   superPrev=new THREE.Mesh(new THREE.RingGeometry(.86,1,40),
@@ -971,7 +1087,12 @@ function addAimLine(){
     new THREE.MeshBasicMaterial({color:C(B().color),transparent:true,opacity:.26,
       side:THREE.DoubleSide,depthWrite:false}));
   aimLine.rotation.x=-Math.PI/2; world.add(aimLine);
+  // the harpoon sight: a spear tip that rides the end of your aim while loaded
+  harpTip=new THREE.Mesh(new THREE.ConeGeometry(.42,1.1,7),
+    new THREE.MeshBasicMaterial({color:C(0xCFE9DC),transparent:true,opacity:.55,depthWrite:false}));
+  harpTip.rotation.x=Math.PI/2; world.add(harpTip);
 }
+let harpTip=null;
 function updateAimLine(){
   if(!aimLine)return;
   const len=(SPORT[G.mode]&&H.held)?15:B().range*.62;
@@ -979,6 +1100,13 @@ function updateAimLine(){
   aimLine.position.set(P.pos.x+P.aim.x*len/2,.10,P.pos.z+P.aim.z*len/2);
   aimLine.rotation.z=-Math.atan2(P.aim.x,P.aim.z);
   aimLine.material.opacity=P.alive?(aimStick?.55:.24):0;
+  if(harpTip){
+    const ready=P.harp<=0&&P.alive&&HARP.state==="idle";
+    const hd=Math.min(len,HARP_RANGE);
+    harpTip.position.set(P.pos.x+P.aim.x*hd,.5,P.pos.z+P.aim.z*hd);
+    harpTip.rotation.z=-Math.atan2(P.aim.x,P.aim.z);
+    harpTip.material.opacity=ready?(.30+Math.sin(G.t*3)*.12):0;
+  }
 }
 function addPlayerRing(){
   playerRing=new THREE.Mesh(new THREE.RingGeometry(1.5,1.78,32),
@@ -1199,6 +1327,7 @@ function updatePlayer(dt){
   if(P.ammo<3){ P.at2+=dt; if(P.at2>=b.reload){P.ammo++;P.at2=0;} }
   if(P.dash>0)P.dash=Math.max(0,P.dash-dt);
   if(P.gad>0)P.gad=Math.max(0,P.gad-dt);
+  if(P.harp>0)P.harp=Math.max(0,P.harp-dt);
   if(mouse.down&&!TOUCH)fire();
 }
 function rivalTarget(){
@@ -1419,12 +1548,16 @@ function updateHUD(){
   const d=$("dash");
   if(P.dash>0){ d.className="cool"; d.textContent="DASH "+P.dash.toFixed(1)+"s"; }
   else { d.className=""; d.textContent=TOUCH?"DASH READY":"DASH READY · SHIFT"; }
+  $("harpName").textContent="Harpoon"+(P.harp>0?" ("+P.harp.toFixed(0)+"s)":" · ready");
+  $("harpBar").firstElementChild.style.width=(100-P.harp/7*100)+"%";
   const gd=GADGETS[b.id];
   $("gadName").textContent="Gadget · "+gd.n+(P.gad>0?" ("+P.gad.toFixed(0)+"s)":"");
   $("gadBar").firstElementChild.style.width=(100-P.gad/14*100)+"%";
   if(TOUCH){
-    const bs=$("bSuper"), bd=$("bDash"), bg=$("bDig"), bgd=$("bGad");
+    const bs=$("bSuper"), bd=$("bDash"), bg=$("bDig"), bgd=$("bGad"), bh=$("bHarp");
     bgd.disabled=P.gad>0; bgd.className="tb"+(P.gad<=0?" ready":"");
+    bh.disabled=P.harp>0||HARP.state!=="idle";
+    bh.className="tb"+(P.harp<=0&&HARP.state==="idle"?" ready":"");
     bs.disabled=P.sup<100; bs.className="tb"+(P.sup>=100?" ready":"");
     bd.disabled=P.dash>0;
     bg.disabled=$("digBox").classList.contains("hidden");
@@ -1670,7 +1803,7 @@ function startMatch(mode){
   ebullets.slice().forEach(e=>{scene.remove(e.m);}); ebullets.length=0;
   splats.slice().forEach(s=>scene.remove(s)); splats.length=0;
   fxDecor.slice().forEach(d=>scene.remove(d.m)); fxDecor.length=0;
-  parts.length=0; pulls.length=0;
+  parts.length=0; pulls.length=0; endHarpoon(); P.harp=0;
   if(mode==="arena")buildArena(); else buildSport(mode);
   lobbyBlob=null;
   camera.position.copy(P.pos.clone().add(new THREE.Vector3(0,21,15.5)));
@@ -1816,7 +1949,7 @@ function frame(now){
   G.t+=dt;
   if(G.running){
     if(SPORT[G.mode]){
-      updateSport(dt);
+      updateSport(dt); stepHarpoon(dt);
       H.time-=dt;
       $("modeMain").innerHTML='<span style="color:'+B().color+'">'+H.score+
         '</span> — <span style="color:#F87171">'+H.rival+'</span>';
@@ -1824,7 +1957,7 @@ function frame(now){
         +(H.held?(H.heldBy==="p"?" · YOU HAVE THE BALL":" · THEY HAVE THE BALL"):"");
       if(H.time<=0)endMatch(H.score>H.rival);
     } else {
-      updatePlayer(dt); updateBots(dt); updateBullets(dt); updateDig(dt);
+      updatePlayer(dt); updateBots(dt); updateBullets(dt); updateDig(dt); stepHarpoon(dt);
     }
     updateCamera(dt); stepParticles(dt); stepDecor(dt); updateHUD(); drawMini();
     renderer.render(scene,camera);

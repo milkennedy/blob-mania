@@ -15,10 +15,10 @@ node server.js        # → http://localhost:3000
 
 No install, no dependencies, no build step. `server.js` is plain Node serving `public/`.
 
-**Controls** — `WASD` move · mouse aim · click shoot · `Shift` dash · `Space` super · `E` dig · `Esc` menu.
+**Controls** — `WASD` move · mouse aim · click shoot · **right-click or `F` harpoon** · `Shift` dash · `Space` super · `G` gadget · `E` dig or dive · `Esc` menu.
 
 **On a phone** it plays in landscape: drag the left side to move, tap the right side to shoot, and
-use the DASH / SUPER / DIG buttons on the right. Add it to your home screen from Safari's share
+use the DASH / SUPER / GADGET / HARPOON / DIG buttons on the right. Add it to your home screen from Safari's share
 menu and it opens full-screen with its own icon, no browser bars.
 
 ## What's in it
