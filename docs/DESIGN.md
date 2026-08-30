@@ -635,6 +635,11 @@ Profile = {
 |---|---|---|---|
 | Move | WASD / arrow keys | Left stick | Left stick |
 | Aim + shoot | Mouse aim, LMB | **Right-side aim stick: drag to aim, release to shoot** | Right stick + RT |
+
+**No aim line.** You point and the shot goes there — there is no line drawn on the ground showing
+where you are pointing. The blob turns to face your aim, and on a phone the stick itself shows
+the direction; that is all the feedback the game gives you. The super still previews its landing
+ring, because that is showing you an *area of effect*, not where a shot is headed.
 | Dash | Shift | Dash button | A |
 | Super | Space or RMB | Super button (locked till full) | RB |
 | Dig | E (on a site) | Dig prompt | X |

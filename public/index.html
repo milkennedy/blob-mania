@@ -981,7 +981,7 @@ function buildArena(){
   P.pos.set(0,1,30); P.hp=P.max=hpOf(B()); P.ammo=3; P.at=0; P.at2=0; P.sup=0; P.dash=0; P.alive=true;
   if(P.blob)world.remove(P.blob.group);
   P.blob=makeBlob(B().color,SK().v,1.15); world.add(P.blob.group);
-  addPlayerRing(); addAimLine(); addSuperPreview();
+  addPlayerRing(); addSuperPreview();
   // bots
   const pal=["#A855F7","#3B82F6","#FACC15","#4ADE3C","#F97316","#EF4444"].filter(c=>c!==B().color);
   const vars=["classic","classic","emerald","gold","amethyst","sapphire"];
@@ -1099,7 +1099,7 @@ function stepHarpoon(dt){
     pts.needsUpdate=true;
   }
 }
-let playerRing=null, aimLine=null, superPrev=null;
+let playerRing=null, superPrev=null;
 function addSuperPreview(){
   superPrev=new THREE.Mesh(new THREE.RingGeometry(.86,1,40),
     new THREE.MeshBasicMaterial({color:C(0xF5B60D),transparent:true,opacity:0,side:THREE.DoubleSide,
@@ -1115,32 +1115,9 @@ function updateSuperPreview(){
   superPrev.material.color.copy(C(B().id==="gold"?0xF5B60D:B().color));
   superPrev.material.opacity=ready?(.28+Math.sin(G.t*4)*.10):0;
 }
-function addAimLine(){
-  aimLine=new THREE.Mesh(new THREE.PlaneGeometry(.5,1),
-    new THREE.MeshBasicMaterial({color:C(B().color),transparent:true,opacity:.26,
-      side:THREE.DoubleSide,depthWrite:false}));
-  aimLine.rotation.x=-Math.PI/2; world.add(aimLine);
-  // the harpoon sight: a spear tip that rides the end of your aim while loaded
-  harpTip=new THREE.Mesh(new THREE.ConeGeometry(.42,1.1,7),
-    new THREE.MeshBasicMaterial({color:C(0xCFE9DC),transparent:true,opacity:.55,depthWrite:false}));
-  harpTip.rotation.x=Math.PI/2; world.add(harpTip);
-}
-let harpTip=null;
-function updateAimLine(){
-  if(!aimLine)return;
-  const len=(SPORT[G.mode]&&H.held)?15:B().range*.62;
-  aimLine.scale.set(1,len,1);
-  aimLine.position.set(P.pos.x+P.aim.x*len/2,.10,P.pos.z+P.aim.z*len/2);
-  aimLine.rotation.z=-Math.atan2(P.aim.x,P.aim.z);
-  aimLine.material.opacity=P.alive?(aimStick?.55:.24):0;
-  if(harpTip){
-    const ready=P.harp<=0&&P.alive&&HARP.state==="idle";
-    const hd=Math.min(len,HARP_RANGE);
-    harpTip.position.set(P.pos.x+P.aim.x*hd,.5,P.pos.z+P.aim.z*hd);
-    harpTip.rotation.z=-Math.atan2(P.aim.x,P.aim.z);
-    harpTip.material.opacity=ready?(.30+Math.sin(G.t*3)*.12):0;
-  }
-}
+/* No aim line, by design: you point and the shot goes there. The blob turns
+   to face where you are aiming — that is the only tell you get, and the only
+   one you need. */
 function addPlayerRing(){
   playerRing=new THREE.Mesh(new THREE.RingGeometry(1.5,1.78,32),
     new THREE.MeshBasicMaterial({color:C(B().color),transparent:true,opacity:.75,side:THREE.DoubleSide,
@@ -1337,7 +1314,7 @@ function updatePlayer(dt){
   if(aimStick){ const ax=aimStick.x-aimStick.ox, az=aimStick.y-aimStick.oy, al=Math.hypot(ax,az);
     if(al>6) P.aim.set(ax/al,0,az/al); }
   else if(!TOUCH) aimFromMouse();
-  updateAimLine(); updateSuperPreview();
+  updateSuperPreview();
   if(P.dashT>0){ P.dashT-=dt; }
   else { P.vel.x=lerp(P.vel.x,mx*b.speed,1-Math.pow(.0009,dt));
          P.vel.z=lerp(P.vel.z,mz*b.speed,1-Math.pow(.0009,dt)); }
@@ -1711,7 +1688,7 @@ function buildSport(mode){
   P.gad=0; P.swim=0; P.submerged=false; P.alive=true;
   if(P.blob)world.remove(P.blob.group);
   P.blob=makeBlob(B().color,SK().v,1.15); world.add(P.blob.group);
-  addPlayerRing(); addAimLine(); addSuperPreview();
+  addPlayerRing(); addSuperPreview();
   const pal=["#A855F7","#3B82F6"].filter(c=>c!==B().color);
   addBot(new THREE.Vector3(-8,1,10),pal[0],"classic");
   addBot(new THREE.Vector3(-8,1,-10),pal[1]||"#EF4444","void");
@@ -1877,7 +1854,7 @@ $("play").onclick=()=>startMatch(G.mode);
 let lobbyBlob=null, lobbyT=0;
 function buildLobby(){
   clearWorld(); crates=[]; bushes=[]; mounds=[]; bots=[]; walls3.length=0;
-  waters=[]; buildings=[]; playerRing=null; aimLine=null;
+  waters=[]; buildings=[]; playerRing=null;
   addGround(60,"#0E1D15");
   // a raised platform with a soft glow ring
   const plat=new THREE.Mesh(new THREE.CylinderGeometry(7,7.6,1.2,44),
