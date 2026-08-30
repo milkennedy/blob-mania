@@ -248,6 +248,10 @@
 
     <div class="picks">
       <div class="pickGroup">
+        <span class="lbl">Difficulty — harder rivals pay more gold and XP</span>
+        <div class="row" id="diffRow"></div>
+      </div>
+      <div class="pickGroup">
         <span class="lbl">Brawler</span>
         <div class="row" id="blobRow"></div>
       </div>
@@ -365,16 +369,34 @@ const GADGETS={
 };
 const RARCOL={Common:"#7C9789",Rare:"#4EA8DE",Epic:"#A855F7",Legendary:"#F5B60D",Mythic:"#FFE9A3"};
 const MODES=[
-  {id:"arena",  ic:"🟢", n:"Dig & Fight",   d:"Seven blobs, no respawns. Dig up new brawlers."},
+  {id:"arena",  ic:"🟢", n:"Dig & Fight",   d:"Last blob standing, no respawns. Dig up new brawlers."},
   {id:"hoops",  ic:"🏀", n:"Blob Hoops",    d:"Grab the ball, shoot the sliding hoop. First to 6."},
   {id:"soccer", ic:"⚽", n:"Blob Kickoff",  d:"Carry it, shoot it into their net. First to 6."},
   {id:"volley", ic:"🏐", n:"Blob Volley",   d:"Over the net, onto their floor. First to 6."}
 ];
 const MODE=id=>MODES.find(m=>m.id===id)||MODES[0];
 
+/* ---- DIFFICULTY ----
+   Everything a rival blob is made of, scaled. hp/dmg multiply their health
+   and their shot; fire is how long they wait between shots (bigger = slower);
+   spread is how wildly they miss; spd is how fast they chase; count is how
+   many turn up. lead makes them aim where you are GOING, which is what
+   separates Grandmaster from Hard. */
+const DIFFS=[
+  {id:"easy",  n:"Easy",        d:"Slow, clumsy rivals. Good for learning the controls.",
+   hp:.55, dmg:.55, fire:1.9, spread:2.6, spd:.78, count:4, reward:.7,  col:"#4ADE3C"},
+  {id:"medium",n:"Medium",      d:"A fair fight.",
+   hp:1,   dmg:1,   fire:1,   spread:1,   spd:1,   count:6, reward:1,   col:"#FACC15"},
+  {id:"hard",  n:"Hard",        d:"Quicker, meaner, and there are more of them.",
+   hp:1.45,dmg:1.35,fire:.70, spread:.55, spd:1.12,count:7, reward:1.35,col:"#FB923C"},
+  {id:"gm",    n:"Grandmaster", d:"They aim where you're going, not where you are.",
+   hp:2.0, dmg:1.7, fire:.50, spread:.28, spd:1.25,count:8, reward:1.8, col:"#EF4444", lead:1}
+];
+const DF=()=>DIFFS.find(d=>d.id===save.diff)||DIFFS[1];
+
 /* ---- save ---- */
 const SAVE="blobmania.v1", OLD_SAVE="blobbrawl3d.v1";
-let save={gold:0,found:["green"],owned:["green"],skins:{},best:0,levels:{}};
+let save={gold:0,found:["green"],owned:["green"],skins:{},best:0,levels:{},diff:"medium"};
 try{const r=localStorage.getItem(SAVE)||localStorage.getItem(OLD_SAVE); if(r){const p=JSON.parse(r);
   if(p&&Array.isArray(p.found)){save=Object.assign(save,p); save.skins=p.skins||{};
     save.levels=p.levels||{};}}}catch(e){}
@@ -985,8 +1007,9 @@ function buildArena(){
   // bots
   const pal=["#A855F7","#3B82F6","#FACC15","#4ADE3C","#F97316","#EF4444"].filter(c=>c!==B().color);
   const vars=["classic","classic","emerald","gold","amethyst","sapphire"];
-  for(let i=0;i<6;i++){
-    const a=i/6*TAU, c=pal[i%pal.length];
+  const nbots=DF().count;
+  for(let i=0;i<nbots;i++){
+    const a=i/nbots*TAU, c=pal[i%pal.length];
     addBot(new THREE.Vector3(Math.cos(a)*26,1,Math.sin(a)*26),c,vars[i%vars.length]);
   }
   G.kills=0; G.gold0=save.gold; G.xpRun=0;
@@ -1126,7 +1149,7 @@ function addPlayerRing(){
 }
 function addBot(pos,color,variant){
   const b=makeBlob(color,variant,1.05); world.add(b.group);
-  const bhp=Math.round(170*(1+.06*(lvOf(B().id).lv-1)));   // rivals keep pace with you
+  const bhp=Math.round(170*(1+.06*(lvOf(B().id).lv-1))*DF().hp);  // level AND difficulty
   bots.push({blob:b,pos:pos.clone(),vel:new THREE.Vector3(),hp:bhp,max:bhp,alive:true,
     ct:1+Math.random()*2,color,slow:0,burn:0,aim:new THREE.Vector3(1,0,0)});
 }
@@ -1141,7 +1164,7 @@ function damageBot(bot,dmg){
   if(bot.hp<=0){
     bot.alive=false; world.remove(bot.blob.group);
     burst(bot.pos,26,10,bot.color,.9,1.8); splat(bot.pos,bot.color);
-    save.gold+=10; G.kills++; addXP(25); persist(); hudGold();
+    save.gold+=Math.round(10*DF().reward); G.kills++; addXP(25*DF().reward); persist(); hudGold();
     if(bots.every(b=>!b.alive)) endMatch(true);
   }
 }
@@ -1278,7 +1301,14 @@ function toast(msg,color){
 const ebullets=[];
 const EB_G=new THREE.SphereGeometry(.28,10,8);
 function botShoot(bot){
-  const dir=P.pos.clone().sub(bot.pos).setY(0).normalize();
+  const target=P.pos.clone();
+  if(DF().lead){                       // Grandmaster leads its shots
+    const t=bot.pos.distanceTo(P.pos)/26;
+    target.add(new THREE.Vector3(P.vel.x,0,P.vel.z).multiplyScalar(t*.9));
+  }
+  const spread=(Math.random()-.5)*.24*DF().spread;
+  const dir=target.sub(bot.pos).setY(0).normalize()
+    .applyAxisAngle(new THREE.Vector3(0,1,0),spread);
   const m=new THREE.Mesh(EB_G,new THREE.MeshStandardMaterial({color:C(bot.color),emissive:C(bot.color),
     emissiveIntensity:1.2,roughness:.4}));
   m.position.copy(bot.pos).setY(1.1); scene.add(m);
@@ -1424,10 +1454,11 @@ function updateBots(dt){
     else if(sees){
       bt.aim.copy(to).normalize();
       const want=d>13?1:(d<8?-1:0);
-      bt.vel.x=lerp(bt.vel.x,bt.aim.x*6.4*want,.08);
-      bt.vel.z=lerp(bt.vel.z,bt.aim.z*6.4*want,.08);
+      const chase=6.4*DF().spd;
+      bt.vel.x=lerp(bt.vel.x,bt.aim.x*chase,.08);
+      bt.vel.z=lerp(bt.vel.z,bt.aim.z*chase,.08);
       bt.ct-=dt*(bt.slow>0?.5:1);
-      if(bt.ct<=0){ bt.ct=1.5+Math.random()*1.4; botShoot(bt); }
+      if(bt.ct<=0){ bt.ct=(1.5+Math.random()*1.4)*DF().fire; botShoot(bt); }
     } else {
       bt.ct-=dt*.4;
       if(bt.ct<=0){ bt.ct=1.6+Math.random()*2.2;
@@ -1487,7 +1518,7 @@ function updateBullets(dt){
   for(let i=ebullets.length-1;i>=0;i--){ const e=ebullets[i];
     e.m.position.addScaledVector(e.dir,e.sp*dt); e.life-=dt;
     let done=e.life<=0;
-    if(!done&&P.alive&&!P.submerged&&e.m.position.distanceTo(P.pos)<1.5){ hurtPlayer(22); burst(e.m.position,10,6,e.m.material.color.getStyle(),.4,1); done=true; }
+    if(!done&&P.alive&&!P.submerged&&e.m.position.distanceTo(P.pos)<1.5){ hurtPlayer(Math.round(22*DF().dmg)); burst(e.m.position,10,6,e.m.material.color.getStyle(),.4,1); done=true; }
     if(!done) for(const w of walls3){ if(e.m.position.distanceTo(w.pos)<6.2&&
         Math.abs(e.m.position.clone().sub(w.pos).dot(w.dir))<1.2){ burst(e.m.position,8,5,"#A5F3FC",.4,1); done=true; break; } }
     if(!done) for(const c of crates){ if(e.m.position.distanceTo(c.pos)<c.r+.3){done=true;break;} }
@@ -1580,7 +1611,8 @@ function updateHUD(){
   }
   if(G.mode==="arena"){
     const left=bots.filter(b2=>b2.alive).length+(P.alive?1:0);
-    $("modeMain").textContent=left+" blobs left"; $("modeSub").textContent="LAST BLOB STANDING";
+    $("modeMain").textContent=left+" blobs left";
+    $("modeSub").innerHTML='LAST BLOB STANDING · <span style="color:'+DF().col+'">'+DF().n.toUpperCase()+'</span>';
   }
 }
 const mini=$("miniC").getContext("2d");
@@ -1692,7 +1724,7 @@ function buildSport(mode){
   const pal=["#A855F7","#3B82F6"].filter(c=>c!==B().color);
   addBot(new THREE.Vector3(-8,1,10),pal[0],"classic");
   addBot(new THREE.Vector3(-8,1,-10),pal[1]||"#EF4444","void");
-  bots.forEach(b=>{b.hp=b.max=260; b.carry=false;});
+  bots.forEach(b=>{ b.hp=b.max=Math.round(260*DF().hp); b.carry=false; });
   G.kills=0; G.gold0=save.gold; G.xpRun=0;
 }
 function resetBall(){ H.ball.position.set(0,1.4,0); H.vel.set(0,0,0);
@@ -1828,8 +1860,8 @@ function startMatch(mode){
 }
 function endMatch(win){
   if(G.over)return; G.over=true; G.running=false; document.body.classList.remove("playing");
-  let earned=SPORT[G.mode]?(win?150:60):(win?100:35);
-  save.gold+=earned; if(win)addXP(150); persist(); hudGold();
+  let earned=Math.round((SPORT[G.mode]?(win?150:60):(win?100:35))*DF().reward);
+  save.gold+=earned; if(win)addXP(150*DF().reward); persist(); hudGold();
   $("overTitle").textContent=win?"Victory":"Splatted";
   $("overTitle").style.color=win?"#4ADE3C":"#F87171";
   const xpLine=G.xpRun?` · <b style="color:#F5B60D">+${Math.round(G.xpRun)} xp</b>`:"";
@@ -1892,6 +1924,9 @@ const SKINCOST={Common:0,Rare:1200,Epic:3000,Legendary:8000,Mythic:25000};
 function buildMenu(){
   const cm=MODE(G.mode);
   $("modeIc").textContent=cm.ic; $("modeName").textContent=cm.n; $("modeDesc").textContent=cm.d;
+  $("diffRow").innerHTML=DIFFS.map(d=>`<button class="pick" data-d="${d.id}"
+      aria-pressed="${d.id===save.diff}"><span class="dot" style="background:${d.col}"></span>${d.n}
+      <span class="cost" style="color:${d.col}">×${d.reward}</span></button>`).join("");
   $("modeList").innerHTML=MODES.map(m=>`<button class="modecard" data-m="${m.id}" aria-pressed="${m.id===G.mode}">
     <span class="ic">${m.ic}</span><span><b>${m.n}</b><small>${m.d}</small></span></button>`).join("");
   // brawlers
@@ -1915,6 +1950,7 @@ function buildMenu(){
   $("statBox").innerHTML=`
     <div class="statline"><span>Level</span><span style="color:var(--gold)">${LV.lv}${
       LV.lv>=MAX_LV?" (max)":" · "+Math.round(LV.xp)+"/"+xpNeeded(LV.lv)+" xp"}</span></div>
+    <div class="statline"><span>Difficulty</span><span style="color:${DF().col}">${DF().n}</span></div>
     <div class="statline"><span>Gadget</span><span>${GADGETS[b.id].n}</span></div>
     <div class="statline"><span>Health</span><span>${hpOf(b)}${LV.lv>1?" (+"+(hpOf(b)-b.hp)+")":""}</span></div>
     <div class="statline"><span>Weapon</span><span>${b.weapon}</span></div>
@@ -1930,6 +1966,8 @@ function buildMenu(){
   hudGold();
   if(lobbyBlob)refreshLobbyBlob();
 }
+$("diffRow").onclick=e=>{const b=e.target.closest("[data-d]"); if(!b)return;
+  save.diff=b.dataset.d; persist(); buildMenu();};
 $("modeBtn").onclick=()=>$("modeSheet").classList.remove("hidden");
 $("sheetClose").onclick=()=>$("modeSheet").classList.add("hidden");
 $("modeList").onclick=e=>{const b=e.target.closest("[data-m]"); if(!b)return; G.mode=b.dataset.m;
@@ -1975,7 +2013,8 @@ function frame(now){
       H.time-=dt;
       $("modeMain").innerHTML='<span style="color:'+B().color+'">'+H.score+
         '</span> — <span style="color:#F87171">'+H.rival+'</span>';
-      $("modeSub").textContent=MODE(G.mode).n.toUpperCase()+" · TO "+WIN_SCORE+" · "+Math.max(0,Math.ceil(H.time))+"s"
+      $("modeSub").innerHTML=MODE(G.mode).n.toUpperCase()+' · <span style="color:'+DF().col+'">'
+        +DF().n.toUpperCase()+'</span> · TO '+WIN_SCORE+' · '+Math.max(0,Math.ceil(H.time))+"s"
         +(H.held?(H.heldBy==="p"?" · YOU HAVE THE BALL":" · THEY HAVE THE BALL"):"");
       if(H.time<=0)endMatch(H.score>H.rival);
     } else {

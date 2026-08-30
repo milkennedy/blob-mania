@@ -255,6 +255,12 @@ The playable build (`public/index.html`) implements this slice:
   as a grapple for crossing ground fast; and in the sports it **drags the ball back to you**. A
   spear tip rides the end of your aim line whenever it's loaded, so you can see the shot before
   you take it. Whatever it meets first wins — a tree in the way will eat a shot meant for a blob.
+- **Four difficulties** — Easy, Medium, Hard, Grandmaster — picked in the lobby and saved. They
+  scale everything a rival is made of: how many turn up (4/6/7/8), their health, how hard their
+  shot hits, how often they fire, how wildly they miss, and how fast they chase.
+  **Grandmaster leads its shots** — it fires at where you are going rather than where you are,
+  which is the thing that makes it a different game rather than just a spongier one.
+  Harder tiers pay more: gold and XP scale ×0.7 / ×1 / ×1.35 / ×1.8, so climbing is worth it.
 - **Levels.** Every brawler levels 1–10 on its own, earned only by playing it: XP for damage
   dealt, splats, goals, digs and wins. Each level is **+5% health and +5% damage** on that
   brawler, so a maxed one is roughly 45% stronger than a fresh one. Rival blobs gain health as
