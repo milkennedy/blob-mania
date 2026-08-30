@@ -38,6 +38,10 @@
   #hpBox{left:18px;top:18px;padding:12px 14px;width:250px}
   #hpBox .name{font-family:var(--display);font-size:19px;font-weight:800;line-height:1}
   #hpBox .skin{font-size:10.5px;color:var(--muted);margin-top:3px;letter-spacing:.06em}
+  .lvrow{display:flex;align-items:center;gap:8px;margin-top:5px;font-size:10px;letter-spacing:.1em;
+    color:var(--gold)}
+  .xpbar{flex:1;height:4px;border-radius:2px;background:#1A2A21;overflow:hidden}
+  .xpbar > i{display:block;height:100%;background:var(--gold);width:0}
   .bar{height:9px;border-radius:5px;background:#1A2A21;margin-top:9px;overflow:hidden}
   .bar > i{display:block;height:100%;background:var(--green);transition:width .12s linear}
   #hpTxt{font-size:11px;color:var(--muted);margin-top:5px;display:flex;justify-content:space-between}
@@ -186,6 +190,7 @@
 <div id="hud" class="hidden">
   <div class="panel" id="hpBox">
     <div class="name" id="hName">Green Blob</div>
+    <div class="lvrow"><span id="hLv">LV 1</span><span class="xpbar"><i id="hXp"></i></span></div>
     <div class="skin" id="hSkin">CLASSIC GREEN · PLASMA BOLT</div>
     <div class="bar"><i id="hpFill" style="width:100%"></i></div>
     <div id="hpTxt"><span id="hpNum">500 / 500</span><span id="killNum">0 splats</span></div>
@@ -369,12 +374,40 @@ const MODE=id=>MODES.find(m=>m.id===id)||MODES[0];
 
 /* ---- save ---- */
 const SAVE="blobmania.v1", OLD_SAVE="blobbrawl3d.v1";
-let save={gold:0,found:["green"],owned:["green"],skins:{},best:0};
+let save={gold:0,found:["green"],owned:["green"],skins:{},best:0,levels:{}};
 try{const r=localStorage.getItem(SAVE)||localStorage.getItem(OLD_SAVE); if(r){const p=JSON.parse(r);
-  if(p&&Array.isArray(p.found)){save=Object.assign(save,p); save.skins=p.skins||{};}}}catch(e){}
+  if(p&&Array.isArray(p.found)){save=Object.assign(save,p); save.skins=p.skins||{};
+    save.levels=p.levels||{};}}}catch(e){}
 function persist(){try{localStorage.setItem(SAVE,JSON.stringify(save));}catch(e){}}
 const found=id=>save.found.indexOf(id)>-1;
 const owned=id=>save.owned.indexOf(id)>-1;
+/* ---- LEVELS ----
+   A brawler levels up by being played: damage, splats, goals, digs, wins.
+   Each level is +5% health and +5% damage on that brawler, capped at 10.
+   This is deliberately NOT how skins work — a skin is cosmetic forever, a
+   level is earned by playing. Keeping them separate is what stops the store
+   ever selling power. */
+const MAX_LV=10;
+const xpNeeded=lv=>150+(lv-1)*120;
+function lvOf(bid){ if(!save.levels[bid])save.levels[bid]={lv:1,xp:0}; return save.levels[bid]; }
+const pwr=bid=>1+.05*(lvOf(bid||B().id).lv-1);
+const hpOf=b=>Math.round(b.hp*pwr(b.id));
+const dmgOf=b=>Math.round(b.dmg*pwr(b.id));
+function addXP(amount,why){
+  if(!G.running)return;
+  const id=B().id, L=lvOf(id);
+  if(L.lv>=MAX_LV)return;
+  L.xp+=amount; G.xpRun=(G.xpRun||0)+amount;
+  while(L.lv<MAX_LV && L.xp>=xpNeeded(L.lv)){
+    L.xp-=xpNeeded(L.lv); L.lv++;
+    toast("LEVEL "+L.lv+"!  +5% health and damage",B().color);
+    if(P.alive){ burst(P.pos.clone().setY(1.4),40,10,B().color,1.1,2.2);
+      ring(P.pos,B().color,9,.7); }
+    const gain=Math.round(BLOBS.find(x=>x.id===id).hp*.05);
+    P.max=hpOf(B()); P.hp=Math.min(P.max,P.hp+gain);   // a level-up tops you up a little
+  }
+  persist();
+}
 function skinsOwned(bid){ if(!save.skins[bid])save.skins[bid]=[0]; return save.skins[bid]; }
 
 /* =========================================================================
@@ -945,7 +978,7 @@ function buildArena(){
   addWaterPool(-30,30,5); addWaterPool(30,-30,5); addWaterPool(0,4,4.2);
   addMound(); addMound();
   // player
-  P.pos.set(0,1,30); P.hp=P.max=B().hp; P.ammo=3; P.at=0; P.at2=0; P.sup=0; P.dash=0; P.alive=true;
+  P.pos.set(0,1,30); P.hp=P.max=hpOf(B()); P.ammo=3; P.at=0; P.at2=0; P.sup=0; P.dash=0; P.alive=true;
   if(P.blob)world.remove(P.blob.group);
   P.blob=makeBlob(B().color,SK().v,1.15); world.add(P.blob.group);
   addPlayerRing(); addAimLine(); addSuperPreview();
@@ -956,7 +989,7 @@ function buildArena(){
     const a=i/6*TAU, c=pal[i%pal.length];
     addBot(new THREE.Vector3(Math.cos(a)*26,1,Math.sin(a)*26),c,vars[i%vars.length]);
   }
-  G.kills=0; G.gold0=save.gold;
+  G.kills=0; G.gold0=save.gold; G.xpRun=0;
 }
 /* ============ THE HARPOON ============
    A spear on a rope. Stick it in a blob and it reels them to you; stick it
@@ -1005,7 +1038,7 @@ function stepHarpoon(dt){
     // a blob? reel them in
     for(const b of bots){
       if(b.alive&&HARP.pos.distanceTo(b.pos)<1.7){
-        HARP.target=b; HARP.state="reelTarget"; damageBot(b,40);
+        HARP.target=b; HARP.state="reelTarget"; damageBot(b,Math.round(40*pwr()));
         burst(HARP.pos.clone(),14,6,"#CFE9DC",.5,1.3); toast("Hooked!","#CFE9DC"); break;
       }
     }
@@ -1116,7 +1149,8 @@ function addPlayerRing(){
 }
 function addBot(pos,color,variant){
   const b=makeBlob(color,variant,1.05); world.add(b.group);
-  bots.push({blob:b,pos:pos.clone(),vel:new THREE.Vector3(),hp:170,max:170,alive:true,
+  const bhp=Math.round(170*(1+.06*(lvOf(B().id).lv-1)));   // rivals keep pace with you
+  bots.push({blob:b,pos:pos.clone(),vel:new THREE.Vector3(),hp:bhp,max:bhp,alive:true,
     ct:1+Math.random()*2,color,slow:0,burn:0,aim:new THREE.Vector3(1,0,0)});
 }
 
@@ -1124,12 +1158,13 @@ function addBot(pos,color,variant){
 function damageBot(bot,dmg){
   if(!bot.alive)return;
   bot.hp-=dmg;
+  addXP(dmg/20);                                     // XP for the work, not just the kill
   if(SPORT[G.mode]&&H.held&&H.heldBy===bot&&Math.random()<.5) dropBall();  // knock it loose P.sup=Math.min(100,P.sup+dmg*.16);
   bot.blob.setHit(true); setTimeout(()=>bot.blob&&bot.blob.setHit(false),70);
   if(bot.hp<=0){
     bot.alive=false; world.remove(bot.blob.group);
     burst(bot.pos,26,10,bot.color,.9,1.8); splat(bot.pos,bot.color);
-    save.gold+=10; G.kills++; persist(); hudGold();
+    save.gold+=10; G.kills++; addXP(25); persist(); hudGold();
     if(bots.every(b=>!b.alive)) endMatch(true);
   }
 }
@@ -1159,10 +1194,11 @@ function fire(){
   if(P.ammo<1||P.at>0)return;
   P.ammo--; P.at=b.rof;
   const fx=SK().fx, origin=P.pos.clone().add(P.aim.clone().multiplyScalar(1.3)).setY(1.1);
+  const cfg=Object.assign({},b,{dmg:dmgOf(b)});      // level scales damage, a skin never does
   for(let i=0;i<b.pellets;i++){
     const off=b.pellets>1?(i-(b.pellets-1)/2)*b.spread:0;
     const d=P.aim.clone().applyAxisAngle(new THREE.Vector3(0,1,0),off);
-    spawnBullet("p",origin,d,b,fx);
+    spawnBullet("p",origin,d,cfg,fx);
   }
   P.vel.add(P.aim.clone().multiplyScalar(-1.4)); // a little kick
 }
@@ -1231,7 +1267,7 @@ function useSuper(){
     toast("Solar Flare","#FB923C"); }
   if(id==="gold"){
     bots.forEach(b=>{ if(!b.alive)return; const d=b.pos.distanceTo(target);
-      if(d<11){ damageBot(b,180); b.vel.add(b.pos.clone().sub(target).setY(0).normalize().multiplyScalar(34)); } });
+      if(d<11){ damageBot(b,Math.round(180*pwr())); b.vel.add(b.pos.clone().sub(target).setY(0).normalize().multiplyScalar(34)); } });
     ring(target,"#FFE9A3",11,.8); ring(target,"#F5B60D",8,.6); burst(target,40,14,"#F5B60D",.9,2.2);
     shake=.5; toast("Golden Meteor","#F5B60D"); }
 }
@@ -1403,7 +1439,7 @@ function updateBots(dt){
       if(tr.kind==="freeze"&&!tr.used){ tr.used=1; bt.slow=2.4;
         burst(bt.pos,18,7,"#A5F3FC",.6,1.5); } } });
     const busy = SPORT[G.mode] && hoopsAI(bt,dt);
-    if(bt.burn>0){ bt.burn-=dt; bt.bt=(bt.bt||0)+dt; if(bt.bt>.5){bt.bt=0;damageBot(bt,22);} 
+    if(bt.burn>0){ bt.burn-=dt; bt.bt=(bt.bt||0)+dt; if(bt.bt>.5){bt.bt=0;damageBot(bt,Math.round(22*pwr()));} 
       if(Math.random()<.4)spark(bt.pos.x,1.4,bt.pos.z,0,2,0,.4,"#FB923C",1.2); }
     const to=P.pos.clone().sub(bt.pos).setY(0); const d=to.length();
     const sees=!busy&&P.alive&&!P.hidden&&!bt.blind&&d<34;
@@ -1435,7 +1471,7 @@ function updateBots(dt){
   for(let i=traps.length-1;i>=0;i--){ traps[i].life-=dt; if(traps[i].life<=0)traps.splice(i,1); }
   for(let i=pulls.length-1;i>=0;i--){ pulls[i].t-=dt;
     if(pulls[i].t<=0){ const p=pulls[i].pos;
-      bots.forEach(b=>{ if(b.alive&&b.pos.distanceTo(p)<7)damageBot(b,100); });
+      bots.forEach(b=>{ if(b.alive&&b.pos.distanceTo(p)<7)damageBot(b,Math.round(100*pwr())); });
       burst(p,26,12,"#A855F7",.7,1.8); ring(p,"#C084FC",7,.5); pulls.splice(i,1); } }
 }
 function updateBullets(dt){
@@ -1506,7 +1542,7 @@ function updateDig(dt){
     if(near.prog>=1){ near.prog=0; near.digs++;
       if(near.digs>=3){ near.digs=0;
         const next=BLOBS.find(b=>!found(b.id));
-        if(next){ save.found.push(next.id); persist();
+        if(next){ save.found.push(next.id); addXP(50); persist();
           toast("Discovered the "+next.name+"!",next.color);
           burst(near.pos.clone().setY(1),60,14,next.color,1.4,2.4); ring(near.pos,next.color,10,.9);
         } else { save.gold+=200; persist(); hudGold(); toast("+200 gold","#F5B60D"); }
@@ -1537,6 +1573,9 @@ function updateHUD(){
   const b=B();
   $("hName").textContent=b.name; $("hName").style.color=b.color;
   $("hSkin").textContent=(SK().n+" · "+SK().e).toUpperCase();
+  const L=lvOf(b.id);
+  $("hLv").textContent="LV "+L.lv+(L.lv>=MAX_LV?" MAX":"");
+  $("hXp").style.width=(L.lv>=MAX_LV?100:(L.xp/xpNeeded(L.lv)*100))+"%";
   $("hpFill").style.width=Math.max(0,P.hp/P.max*100)+"%";
   $("hpFill").style.background=P.hp/P.max>.3?b.color:"#F87171";
   $("hpNum").textContent=Math.max(0,Math.round(P.hp))+" / "+P.max;
@@ -1668,7 +1707,7 @@ function buildSport(mode){
   ball.castShadow=true; ball.position.set(0,1.2,0); world.add(ball);
   H.ball=ball; H.vel.set(0,0,0);
 
-  P.pos.set(12,1,0); P.hp=P.max=B().hp; P.ammo=3; P.at=0; P.at2=0; P.sup=0; P.dash=0;
+  P.pos.set(12,1,0); P.hp=P.max=hpOf(B()); P.ammo=3; P.at=0; P.at2=0; P.sup=0; P.dash=0;
   P.gad=0; P.swim=0; P.submerged=false; P.alive=true;
   if(P.blob)world.remove(P.blob.group);
   P.blob=makeBlob(B().color,SK().v,1.15); world.add(P.blob.group);
@@ -1677,7 +1716,7 @@ function buildSport(mode){
   addBot(new THREE.Vector3(-8,1,10),pal[0],"classic");
   addBot(new THREE.Vector3(-8,1,-10),pal[1]||"#EF4444","void");
   bots.forEach(b=>{b.hp=b.max=260; b.carry=false;});
-  G.kills=0; G.gold0=save.gold;
+  G.kills=0; G.gold0=save.gold; G.xpRun=0;
 }
 function resetBall(){ H.ball.position.set(0,1.4,0); H.vel.set(0,0,0);
   H.held=false; H.heldBy=null; H.cool=.6; bots.forEach(b=>b.carry=false); }
@@ -1757,7 +1796,7 @@ function updateSport(dt){
   scoreCheck();
 }
 function award(mine,pts,at,col){
-  if(mine){ H.score+=pts; save.gold+=pts*8; persist(); hudGold();
+  if(mine){ H.score+=pts; save.gold+=pts*8; addXP(pts*20); persist(); hudGold();
     toast(pts===3?"THREE POINTER!":"Score!",col||"#4ADE3C"); }
   else { H.rival+=pts; toast("They scored "+pts,"#F87171"); }
   burst(at.clone(),34,11,col||"#F5B60D",.9,2);
@@ -1813,12 +1852,13 @@ function startMatch(mode){
 function endMatch(win){
   if(G.over)return; G.over=true; G.running=false; document.body.classList.remove("playing");
   let earned=SPORT[G.mode]?(win?150:60):(win?100:35);
-  save.gold+=earned; persist(); hudGold();
+  save.gold+=earned; if(win)addXP(150); persist(); hudGold();
   $("overTitle").textContent=win?"Victory":"Splatted";
   $("overTitle").style.color=win?"#4ADE3C":"#F87171";
+  const xpLine=G.xpRun?` · <b style="color:#F5B60D">+${Math.round(G.xpRun)} xp</b>`:"";
   $("overText").innerHTML = SPORT[G.mode]
-    ? `${H.score} — ${H.rival} · <b style="color:#F5B60D">+${earned} gold</b>`
-    : `${G.kills} splats · <b style="color:#F5B60D">+${earned} gold</b>`;
+    ? `${H.score} — ${H.rival} · <b style="color:#F5B60D">+${earned} gold</b>${xpLine}`
+    : `${G.kills} splats · <b style="color:#F5B60D">+${earned} gold</b>${xpLine}`;
   $("over").classList.remove("hidden");
 }
 function toMenu(){
@@ -1882,8 +1922,10 @@ function buildMenu(){
     const ok=owned(b.id), fnd=found(b.id);
     const label = ok ? b.name : (fnd? b.name+` <span class="cost">${b.priceTxt}</span>`
                                     : `??? <span class="cost">dig to find</span>`);
+    const L=lvOf(b.id);
     return `<button class="pick" data-b="${i}" aria-pressed="${i===curBlob}" ${fnd?"":"disabled"}>
-      <span class="dot" style="background:${ok?b.color:"#3A4A42"}"></span>${label}</button>`;}).join("");
+      <span class="dot" style="background:${ok?b.color:"#3A4A42"}"></span>${label}${
+        ok?` <span class="cost" style="color:var(--gold)">LV ${L.lv}</span>`:""}</button>`;}).join("");
   // skins
   const list=SKINS[B().id], mine=skinsOwned(B().id);
   $("skinRow").innerHTML=list.map((s,i)=>{
@@ -1892,11 +1934,14 @@ function buildMenu(){
       <span class="dot" style="background:${s.fx.c}"></span>${s.n}
       <span class="cost" style="color:${RARCOL[s.r]}">${ok?s.r:"◈ "+SKINCOST[s.r].toLocaleString()}</span></button>`;}).join("");
   const b=B();
+  const LV=lvOf(b.id);
   $("statBox").innerHTML=`
+    <div class="statline"><span>Level</span><span style="color:var(--gold)">${LV.lv}${
+      LV.lv>=MAX_LV?" (max)":" · "+Math.round(LV.xp)+"/"+xpNeeded(LV.lv)+" xp"}</span></div>
     <div class="statline"><span>Gadget</span><span>${GADGETS[b.id].n}</span></div>
-    <div class="statline"><span>Health</span><span>${b.hp}</span></div>
+    <div class="statline"><span>Health</span><span>${hpOf(b)}${LV.lv>1?" (+"+(hpOf(b)-b.hp)+")":""}</span></div>
     <div class="statline"><span>Weapon</span><span>${b.weapon}</span></div>
-    <div class="statline"><span>Damage</span><span>${b.pellets>1?b.dmg+" × "+b.pellets:b.dmg}${b.splash?" splash":""}</span></div>
+    <div class="statline"><span>Damage</span><span>${b.pellets>1?dmgOf(b)+" × "+b.pellets:dmgOf(b)}${b.splash?" splash":""}</span></div>
     <div class="statline"><span>Super</span><span>${b.sup}</span></div>
     <div class="statline"><span>Skin</span><span style="color:${RARCOL[SK().r]}">${SK().e}</span></div>`;
   const ownedSkin=mine.indexOf(curSkin)>-1;

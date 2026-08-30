@@ -255,6 +255,12 @@ The playable build (`public/index.html`) implements this slice:
   as a grapple for crossing ground fast; and in the sports it **drags the ball back to you**. A
   spear tip rides the end of your aim line whenever it's loaded, so you can see the shot before
   you take it. Whatever it meets first wins — a tree in the way will eat a shot meant for a blob.
+- **Levels.** Every brawler levels 1–10 on its own, earned only by playing it: XP for damage
+  dealt, splats, goals, digs and wins. Each level is **+5% health and +5% damage** on that
+  brawler, so a maxed one is roughly 45% stronger than a fresh one. Rival blobs gain health as
+  you level so the fight keeps its teeth. A level-up tops your health up mid-match.
+  **This is the one system allowed to change your numbers, and it cannot be bought** — skins
+  stay purely cosmetic, which is what keeps the store from ever selling power (§1, pillar 2).
 - **Terrain that matters.** Tall grass and the inside of a building hide you — you can still
   shoot out and can still be shot, you just can't be *seen*. Trees and crystals block shots.
 - **Water is a portal network.** Stand in a pool, press E, and you swim under the map and

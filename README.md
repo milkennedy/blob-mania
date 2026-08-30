@@ -30,6 +30,8 @@ menu and it opens full-screen with its own icon, no browser bars.
   gem rather than a white one. Royal wears a crown, Void has shards orbiting it, Electric arcs
   lightning, Toxic drips, Solar spins a corona, Ultimate Golden is molten gold.
 - **Digging** — three digs at a mound discovers the next brawler, in a fixed order. Gold buys it.
+- **Levels** — each brawler levels 1–10 by being played (damage, splats, goals, digs, wins), and
+  each level is +5% health and +5% damage on that brawler. Levels are earned, never bought.
 - **Two modes** — Last Blob Standing, and Blob Hoops where the hoop rides a rail across the back
   line and speeds up every time you score.
 
